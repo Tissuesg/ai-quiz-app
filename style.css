@@ -34,7 +34,7 @@ body {
 
 #app {
     width: 100%;
-    max-width: 800px;
+    max-width: 1200px;
     padding: 2rem 1.5rem;
     display: flex;
     flex-direction: column;
@@ -488,3 +488,42 @@ select:focus, input:focus {
 
 .border-top { border-top: 1px solid var(--card-border); }
 .pt-4 { padding-top: 1.5rem; }
+
+/* Responsive Adjustments */
+@media (max-width: 768px) {
+    #app {
+        padding: 1rem 0.5rem;
+        gap: 1.2rem;
+    }
+    
+    .glass-card {
+        padding: 1.2rem;
+        border-radius: 0.8rem;
+    }
+    
+    #questionText {
+        font-size: 1.05rem;
+        margin-bottom: 1.5rem;
+    }
+    
+    .option-btn {
+        padding: 0.8rem 1rem;
+        font-size: 0.95rem;
+    }
+    
+    .explanation-box {
+        padding: 1rem;
+    }
+    
+    .markdown-body {
+        font-size: 0.95rem;
+    }
+    
+    .stats-overview {
+        grid-template-columns: 1fr;
+    }
+    
+    .logo {
+        font-size: 1.2rem;
+    }
+}
