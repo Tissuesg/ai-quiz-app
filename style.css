@@ -489,6 +489,44 @@ select:focus, input:focus {
 .border-top { border-top: 1px solid var(--card-border); }
 .pt-4 { padding-top: 1.5rem; }
 
+/* v1.3 Styles */
+.checkbox-group {
+    margin-top: 0.5rem;
+}
+
+.check-label {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    cursor: pointer;
+    font-size: 0.9rem;
+    color: var(--text-primary);
+    background: rgba(255, 255, 255, 0.05);
+    padding: 0.8rem 1rem;
+    border-radius: 0.5rem;
+    border: 1px solid var(--card-border);
+    transition: all 0.2s;
+}
+
+.check-label:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.check-label input[type="checkbox"] {
+    width: auto;
+    cursor: pointer;
+    accent-color: var(--primary-color);
+}
+
+.action-buttons {
+    display: flex;
+    gap: 1rem;
+}
+
+.flex-1 {
+    flex: 1;
+}
+
 /* Responsive Adjustments */
 @media (max-width: 768px) {
     #app {
@@ -509,6 +547,11 @@ select:focus, input:focus {
     .option-btn {
         padding: 0.8rem 1rem;
         font-size: 0.95rem;
+    }
+    
+    .action-buttons {
+        flex-direction: column;
+        gap: 0.8rem;
     }
     
     .explanation-box {

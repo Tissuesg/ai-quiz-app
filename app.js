@@ -29,8 +29,10 @@ const EXAM_DATA = {
 let currentQuiz = null;
 let currentExam = 'sme';
 let currentCategory = '';
+let isReviewMode = false;
 let stats = JSON.parse(localStorage.getItem('quagenius_stats')) || { total: 0, correct: 0, categories: {} };
-let nextQuizPromise = null; // ★ 先読み用のプロミスを保持
+let mistakes = JSON.parse(localStorage.getItem('quagenius_mistakes')) || [];
+let nextQuizPromise = null;
 
 // DOM Elements
 const settingsBtn = document.getElementById('settingsBtn');
@@ -48,7 +50,11 @@ const toast = document.getElementById('toast');
 
 const examSelect = document.getElementById('examSelect');
 const categorySelect = document.getElementById('categorySelect');
+const calcOptionCheckbox = document.getElementById('calcOptionCheckbox');
+
 const generateBtn = document.getElementById('generateBtn');
+const reviewBtn = document.getElementById('reviewBtn');
+const mistakeCountSpan = document.getElementById('mistakeCount');
 const btnText = generateBtn.querySelector('.btn-text');
 const spinner = generateBtn.querySelector('.spinner');
 
@@ -88,6 +94,7 @@ function init() {
     // Populate Categories initially
     updateCategories();
     renderStats();
+    updateReviewBtnState();
 
     // Event Listeners
     settingsBtn.addEventListener('click', () => apiModal.classList.remove('hidden'));
@@ -99,25 +106,32 @@ function init() {
     document.getElementById('closeStatsBtn').addEventListener('click', () => statsModal.classList.add('hidden'));
     
     document.getElementById('resetStatsBtn').addEventListener('click', () => {
-        if(confirm('今までの統計データをすべてリセットしますか？')) {
+        if(confirm('今までの統計データと「間違えた問題ストック」をすべてリセットしますか？')) {
             stats = { total: 0, correct: 0, categories: {} };
+            mistakes = [];
             localStorage.setItem('quagenius_stats', JSON.stringify(stats));
+            localStorage.setItem('quagenius_mistakes', JSON.stringify(mistakes));
             renderStats();
-            showToast('統計データをリセットしました');
+            updateReviewBtnState();
+            showToast('すべてのデータをリセットしました');
         }
     });
 
     saveApiBtn.addEventListener('click', saveApiSettings);
     examSelect.addEventListener('change', () => {
         updateCategories();
-        nextQuizPromise = null; // カテゴリが変わったら先読みを破棄
+        nextQuizPromise = null;
     });
     categorySelect.addEventListener('change', () => {
-        nextQuizPromise = null; // カテゴリが変わったら先読みを破棄
+        nextQuizPromise = null;
+    });
+    calcOptionCheckbox.addEventListener('change', () => {
+        nextQuizPromise = null;
     });
     
     // 初回生成ボタン
     generateBtn.addEventListener('click', async () => {
+        isReviewMode = false;
         setLoading(true);
         quizSection.classList.add('hidden');
         resultSection.classList.add('hidden');
@@ -133,34 +147,62 @@ function init() {
         }
     });
 
-    // 「次の問題へ」ボタン（先読みデータを使用）
+    // 復習モードボタン
+    reviewBtn.addEventListener('click', () => {
+        if (mistakes.length === 0) return;
+        isReviewMode = true;
+        quizSection.classList.add('hidden');
+        resultSection.classList.add('hidden');
+        
+        // ストックからランダムに1問取得
+        const randomIndex = Math.floor(Math.random() * mistakes.length);
+        const reviewQuiz = mistakes[randomIndex];
+        // 復習用にindexを保持しておく
+        reviewQuiz.mistakeIndex = randomIndex; 
+        
+        engineBadge.textContent = '復習モード';
+        displayQuiz(reviewQuiz);
+    });
+
+    // 「次の問題へ」ボタン
     nextBtn.addEventListener('click', async () => {
+        if (isReviewMode) {
+            // 復習モード継続
+            reviewBtn.click();
+            return;
+        }
+
         if (!nextQuizPromise) return;
 
         setNextBtnLoading(true);
         try {
-            // 裏側で走っている生成処理を待つ（すでに終わっていれば一瞬で解決する）
             const data = await nextQuizPromise;
-            
             resultSection.classList.add('hidden');
             quizSection.classList.add('hidden');
-            
             displayQuiz(data);
         } catch (e) {
             console.error(e);
             showToast('次の問題の生成に失敗しました。もう一度生成をお試しください。');
-            nextQuizPromise = fetchQuizData(); // 失敗した場合は再フェッチを仕掛けておく
+            nextQuizPromise = fetchQuizData();
         } finally {
             setNextBtnLoading(false);
         }
     });
 
-    // Close modal on outside click
     [apiModal, statsModal].forEach(modal => {
         modal.addEventListener('click', (e) => {
             if (e.target === modal) modal.classList.add('hidden');
         });
     });
+}
+
+function updateReviewBtnState() {
+    mistakeCountSpan.textContent = mistakes.length;
+    if (mistakes.length > 0) {
+        reviewBtn.disabled = false;
+    } else {
+        reviewBtn.disabled = true;
+    }
 }
 
 function updateApiModalUI() {
@@ -230,7 +272,6 @@ function setNextBtnLoading(isLoading) {
     }
 }
 
-// 実際のAPI通信を行う関数
 async function fetchQuizData() {
     const engine = localStorage.getItem('ai_engine') || 'gemini';
     const apiKey = localStorage.getItem(`${engine}_api_key`);
@@ -242,11 +283,12 @@ async function fetchQuizData() {
 
     currentExam = examSelect.value;
     currentCategory = categorySelect.value;
+    const isCalcMode = calcOptionCheckbox.checked;
     const examName = EXAM_DATA[currentExam].name;
 
     engineBadge.textContent = engine === 'gemini' ? 'Gemini 2.5' : 'GPT-4o-mini';
 
-    const prompt = `あなたは「${examName}」の専門講師です。
+    let prompt = `あなたは「${examName}」の専門講師です。
 以下の要件に従って、「${currentCategory}」分野の本試験レベルの4択問題を1問作成してください。
 
 【厳守事項】
@@ -262,6 +304,11 @@ async function fetchQuizData() {
   "correct_index": 0,
   "explanation": "詳細な解説をここに記述"
 }`;
+
+    // 計算問題・表問題の強制オプション
+    if (isCalcMode) {
+        prompt += `\n\n【特別指示】\n必ず「具体的な数値を用いた計算問題」または「表やデータを用いた分析問題」を出題してください。問題文の中に具体的な数値条件を含めてください。`;
+    }
 
     if (engine === 'gemini') {
         return await fetchGemini(prompt, apiKey);
@@ -285,7 +332,10 @@ async function fetchGemini(prompt, apiKey) {
 
     if (!response.ok) throw new Error(`Gemini API Error: ${response.status}`);
     const data = await response.json();
-    return JSON.parse(data.candidates[0].content.parts[0].text);
+    let quiz = JSON.parse(data.candidates[0].content.parts[0].text);
+    quiz.exam = currentExam;
+    quiz.category = currentCategory;
+    return quiz;
 }
 
 async function fetchOpenAI(prompt, apiKey) {
@@ -308,13 +358,20 @@ async function fetchOpenAI(prompt, apiKey) {
 
     if (!response.ok) throw new Error(`OpenAI API Error: ${response.status}`);
     const data = await response.json();
-    return JSON.parse(data.choices[0].message.content);
+    let quiz = JSON.parse(data.choices[0].message.content);
+    quiz.exam = currentExam;
+    quiz.category = currentCategory;
+    return quiz;
 }
 
 function displayQuiz(quiz) {
     currentQuiz = quiz;
     questionText.textContent = quiz.question;
     optionsContainer.innerHTML = '';
+
+    // バッジにカテゴリ情報も表示
+    const examLabel = quiz.exam === 'sme' ? '診断士' : 'FP1';
+    engineBadge.textContent = isReviewMode ? `復習: [${examLabel}] ${quiz.category}` : engineBadge.textContent;
 
     quiz.options.forEach((option, index) => {
         const btn = document.createElement('button');
@@ -333,8 +390,8 @@ function handleAnswer(selectedIndex, selectedBtn) {
 
     const isCorrect = selectedIndex === currentQuiz.correct_index;
 
-    // Update Stats
-    updateStats(isCorrect);
+    // Update Stats & Mistakes Stock
+    updateStatsAndMistakes(isCorrect);
 
     // Highlight selected
     selectedBtn.classList.add('selected');
@@ -358,18 +415,21 @@ function handleAnswer(selectedIndex, selectedBtn) {
     resultSection.classList.remove('hidden');
     resultSection.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 
-    // ★ ここで即座に裏側（バックグラウンド）で次の問題を生成開始する
-    nextQuizPromise = fetchQuizData().catch(e => {
-        console.error("Background fetch failed:", e);
-        throw e;
-    });
+    // 先読み生成の開始 (復習モード以外の場合)
+    if (!isReviewMode) {
+        nextQuizPromise = fetchQuizData().catch(e => {
+            console.error("Background fetch failed:", e);
+            throw e;
+        });
+    }
 }
 
-function updateStats(isCorrect) {
+function updateStatsAndMistakes(isCorrect) {
+    // 1. 統計データの更新 (復習モードでも正答率は反映される)
     stats.total += 1;
     if (isCorrect) stats.correct += 1;
 
-    const catKey = `${currentExam}_${currentCategory}`;
+    const catKey = `${currentQuiz.exam}_${currentQuiz.category}`;
     if (!stats.categories[catKey]) {
         stats.categories[catKey] = { total: 0, correct: 0 };
     }
@@ -378,6 +438,22 @@ function updateStats(isCorrect) {
     if (isCorrect) stats.categories[catKey].correct += 1;
 
     localStorage.setItem('quagenius_stats', JSON.stringify(stats));
+
+    // 2. 復習ストックの更新
+    if (!isCorrect && !isReviewMode) {
+        // 新規で間違えた場合はストックに追加
+        mistakes.push(currentQuiz);
+        localStorage.setItem('quagenius_mistakes', JSON.stringify(mistakes));
+        showToast('間違えた問題としてストックしました');
+    } else if (isCorrect && isReviewMode) {
+        // 復習モードで正解した場合はストックから削除（消化）
+        if (currentQuiz.mistakeIndex !== undefined) {
+            mistakes.splice(currentQuiz.mistakeIndex, 1);
+            localStorage.setItem('quagenius_mistakes', JSON.stringify(mistakes));
+            showToast('正解しました！ストックから削除されました');
+        }
+    }
+    updateReviewBtnState();
 }
 
 function renderStats() {
@@ -396,7 +472,6 @@ function renderStats() {
         return;
     }
 
-    // Sort categories by lowest accuracy first (to highlight weaknesses)
     const sortedCats = Object.entries(stats.categories).sort((a, b) => {
         const accA = a[1].correct / a[1].total;
         const accB = b[1].correct / b[1].total;
