@@ -302,7 +302,7 @@ async function fetchQuizData() {
 【厳守事項】
 1. 本試験の過去問傾向に沿った実践的で良質な問題であること。
 2. 選択肢は4つ（正解は1つ）。
-3. 各選択肢について、なぜそれが正解・不正解なのかを深く理解できるように、丁寧で詳細な解説(explanation)を作成すること（文字数制限なし）。
+3. 解説(explanation)は、必ず各選択肢（1〜4）ごとに段落を分け、それぞれの冒頭に【適切】または【不適切】と明記した上で、なぜそうなるのかを詳細に解説すること。改行を用いて視覚的に読みやすく整理すること。
 4. ※重要：問題および解説は、最新の法令および税制（現在施行されている基準）に完全に準拠した内容にしてください。古い法令に基づいた出題は絶対に避けてください。
 5. 出力は必ず以下のJSON形式のみとすること（マークダウン不要）。
 
@@ -318,11 +318,25 @@ async function fetchQuizData() {
         prompt += `\n\n【特別指示】\n必ず「具体的な数値を用いた計算問題」または「表やデータを用いた分析問題」を出題してください。問題文の中に具体的な数値条件を含めてください。`;
     }
 
-        if (engine === 'gemini') {
-            return await fetchGemini(prompt, apiKey);
-        } else {
-            return await fetchOpenAI(prompt, apiKey);
+    // 自動リトライ用のラッパー関数
+    const fetchWithRetry = async (fetcher, retries = 2) => {
+        try {
+            return await fetcher(prompt, apiKey);
+        } catch (e) {
+            if (e.message === 'RATE_LIMIT' && retries > 0) {
+                console.warn('Rate limited. Retrying in 3 seconds...');
+                await new Promise(resolve => setTimeout(resolve, 3000));
+                return await fetchWithRetry(fetcher, retries - 1);
+            }
+            throw e;
         }
+    };
+
+    if (engine === 'gemini') {
+        return await fetchWithRetry(fetchGemini);
+    } else {
+        return await fetchWithRetry(fetchOpenAI);
+    }
 }
 
 // AIが余計な文字（マークダウン等）を含めても強制的にJSONを抽出する関数
