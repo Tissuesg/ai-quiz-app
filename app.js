@@ -323,9 +323,6 @@ async function fetchQuizData() {
         } else {
             return await fetchOpenAI(prompt, apiKey);
         }
-    } catch (e) {
-        throw e;
-    }
 }
 
 // AIが余計な文字（マークダウン等）を含めても強制的にJSONを抽出する関数
