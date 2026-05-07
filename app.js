@@ -141,7 +141,11 @@ function init() {
             displayQuiz(data);
         } catch (e) {
             console.error(e);
-            showToast('問題の生成に失敗しました。');
+            if (e.message === 'RATE_LIMIT') {
+                showToast('APIの制限(短時間にリクエストしすぎ)にかかりました。数秒待ってお試しください。');
+            } else {
+                showToast('AIが不正なデータを返したため、生成に失敗しました。再度お試しください。');
+            }
         } finally {
             setLoading(false);
         }
@@ -182,7 +186,11 @@ function init() {
             displayQuiz(data);
         } catch (e) {
             console.error(e);
-            showToast('次の問題の生成に失敗しました。もう一度生成をお試しください。');
+            if (e.message === 'RATE_LIMIT') {
+                showToast('APIの制限にかかりました。数秒待ってからボタンを押してください。');
+            } else {
+                showToast('次の問題の生成に失敗しました。もう一度生成をお試しください。');
+            }
             nextQuizPromise = fetchQuizData();
         } finally {
             setNextBtnLoading(false);
@@ -310,10 +318,33 @@ async function fetchQuizData() {
         prompt += `\n\n【特別指示】\n必ず「具体的な数値を用いた計算問題」または「表やデータを用いた分析問題」を出題してください。問題文の中に具体的な数値条件を含めてください。`;
     }
 
-    if (engine === 'gemini') {
-        return await fetchGemini(prompt, apiKey);
-    } else {
-        return await fetchOpenAI(prompt, apiKey);
+        if (engine === 'gemini') {
+            return await fetchGemini(prompt, apiKey);
+        } else {
+            return await fetchOpenAI(prompt, apiKey);
+        }
+    } catch (e) {
+        throw e;
+    }
+}
+
+// AIが余計な文字（マークダウン等）を含めても強制的にJSONを抽出する関数
+function parseRobustJSON(text) {
+    try {
+        return JSON.parse(text);
+    } catch (e) {
+        // マークダウンブロック ```json ... ``` を取り除く
+        const match = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+        if (match) {
+            return JSON.parse(match[1]);
+        }
+        // それでもダメなら最初の { から最後の } までを抽出
+        const start = text.indexOf('{');
+        const end = text.lastIndexOf('}');
+        if (start !== -1 && end !== -1) {
+            return JSON.parse(text.substring(start, end + 1));
+        }
+        throw new Error('JSON parsing failed completely');
     }
 }
 
@@ -330,9 +361,12 @@ async function fetchGemini(prompt, apiKey) {
         })
     });
 
-    if (!response.ok) throw new Error(`Gemini API Error: ${response.status}`);
+    if (!response.ok) {
+        if (response.status === 429) throw new Error('RATE_LIMIT');
+        throw new Error(`Gemini API Error: ${response.status}`);
+    }
     const data = await response.json();
-    let quiz = JSON.parse(data.candidates[0].content.parts[0].text);
+    let quiz = parseRobustJSON(data.candidates[0].content.parts[0].text);
     quiz.exam = currentExam;
     quiz.category = currentCategory;
     return quiz;
@@ -356,9 +390,12 @@ async function fetchOpenAI(prompt, apiKey) {
         })
     });
 
-    if (!response.ok) throw new Error(`OpenAI API Error: ${response.status}`);
+    if (!response.ok) {
+        if (response.status === 429) throw new Error('RATE_LIMIT');
+        throw new Error(`OpenAI API Error: ${response.status}`);
+    }
     const data = await response.json();
-    let quiz = JSON.parse(data.choices[0].message.content);
+    let quiz = parseRobustJSON(data.choices[0].message.content);
     quiz.exam = currentExam;
     quiz.category = currentCategory;
     return quiz;
