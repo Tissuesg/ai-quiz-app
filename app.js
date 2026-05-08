@@ -58,6 +58,10 @@ const mistakeCountSpan = document.getElementById('mistakeCount');
 const btnText = generateBtn.querySelector('.btn-text');
 const spinner = generateBtn.querySelector('.spinner');
 
+const skipBtn = document.getElementById('skipBtn');
+const skipBtnText = skipBtn.querySelector('.btn-text');
+const skipBtnSpinner = skipBtn.querySelector('.spinner');
+
 const quizSection = document.getElementById('quizSection');
 const engineBadge = document.getElementById('engineBadge');
 const questionText = document.getElementById('questionText');
@@ -197,6 +201,30 @@ function init() {
         }
     });
 
+    // 「この問題をスキップ」ボタン
+    skipBtn.addEventListener('click', async () => {
+        if (isReviewMode) {
+            reviewBtn.click();
+            return;
+        }
+
+        skipBtn.disabled = true;
+        skipBtnText.classList.add('hidden');
+        skipBtnSpinner.classList.remove('hidden');
+
+        try {
+            const data = await fetchQuizData();
+            displayQuiz(data);
+        } catch (e) {
+            console.error(e);
+            showToast('問題の生成に失敗しました。再度お試しください。');
+        } finally {
+            skipBtn.disabled = false;
+            skipBtnText.classList.remove('hidden');
+            skipBtnSpinner.classList.add('hidden');
+        }
+    });
+
     [apiModal, statsModal].forEach(modal => {
         modal.addEventListener('click', (e) => {
             if (e.target === modal) modal.classList.add('hidden');
@@ -307,8 +335,10 @@ async function fetchQuizData() {
    - 【各選択肢の解説】: 選択肢1〜4について、以下のフォーマットで記述。
      **選択肢1**
      （選択肢の原文または要約）
-     判定：【適切】または【不適切】
-     理由：（詳細な解説）
+     
+     **判定：【適切】または【不適切】**
+     
+     **理由：**（詳細な解説）
    - 【ワンポイントアドバイス】: 実務や試験対策に役立つTipsを追記。
 4. ※重要：問題および解説は、最新の法令および税制（現在施行されている基準）に完全に準拠した内容にしてください。古い法令に基づいた出題は絶対に避けてください。
 5. 出力は必ず以下のJSON形式のみとすること（全体を\`\`\`json等で囲まないこと）。
