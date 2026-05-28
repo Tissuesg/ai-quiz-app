@@ -22,6 +22,17 @@ const EXAM_DATA = {
             "不動産",
             "相続・事業承継"
         ]
+    },
+    tax: {
+        name: "税理士",
+        categories: [
+            "簿記論",
+            "財務諸表論",
+            "所得税法",
+            "法人税法",
+            "相続税法",
+            "消費税法"
+        ]
     }
 };
 
@@ -31,8 +42,15 @@ let currentExam = 'sme';
 let currentCategory = '';
 let isReviewMode = false;
 let stats = JSON.parse(localStorage.getItem('quagenius_stats')) || { total: 0, correct: 0, categories: {} };
+if (!stats.dailyHistory) {
+    stats.dailyHistory = {};
+}
 let mistakes = JSON.parse(localStorage.getItem('quagenius_mistakes')) || [];
 let nextQuizPromise = null;
+
+// Learning Tracking & TTS State
+let sessionSeconds = 0;
+let isSpeaking = false;
 
 // DOM Elements
 const settingsBtn = document.getElementById('settingsBtn');
@@ -74,6 +92,8 @@ const explanationText = document.getElementById('explanationText');
 const nextBtn = document.getElementById('nextBtn');
 const nextBtnText = nextBtn.querySelector('.btn-text');
 const nextBtnSpinner = nextBtn.querySelector('.spinner');
+const ttsBtn = document.getElementById('ttsBtn');
+const printBtn = document.getElementById('printBtn');
 
 // Initialize
 function init() {
@@ -135,6 +155,7 @@ function init() {
     
     // 初回生成ボタン
     generateBtn.addEventListener('click', async () => {
+        stopSpeaking(); // 音声を停止
         isReviewMode = false;
         setLoading(true);
         quizSection.classList.add('hidden');
@@ -157,6 +178,7 @@ function init() {
 
     // 復習モードボタン
     reviewBtn.addEventListener('click', () => {
+        stopSpeaking(); // 音声を停止
         if (mistakes.length === 0) return;
         isReviewMode = true;
         quizSection.classList.add('hidden');
@@ -174,6 +196,7 @@ function init() {
 
     // 「次の問題へ」ボタン
     nextBtn.addEventListener('click', async () => {
+        stopSpeaking(); // 音声を停止
         if (isReviewMode) {
             // 復習モード継続
             reviewBtn.click();
@@ -203,6 +226,7 @@ function init() {
 
     // 「この問題をスキップ」ボタン
     skipBtn.addEventListener('click', async () => {
+        stopSpeaking(); // 音声を停止
         if (isReviewMode) {
             reviewBtn.click();
             return;
@@ -230,6 +254,26 @@ function init() {
             if (e.target === modal) modal.classList.add('hidden');
         });
     });
+
+    // 音声読み上げボタンのリスナー
+    ttsBtn.addEventListener('click', () => {
+        if (isSpeaking) {
+            stopSpeaking();
+        } else {
+            startSpeaking();
+        }
+    });
+
+    // PDFエクスポート・印刷ボタンのリスナー
+    printBtn.addEventListener('click', () => {
+        window.print();
+    });
+
+    // 学習時間トラッキングタイマーの開始 (1秒ごと)
+    setInterval(() => {
+        sessionSeconds++;
+        updateTodayStudyTimeData();
+    }, 1000);
 }
 
 function updateReviewBtnState() {
@@ -453,12 +497,13 @@ async function fetchOpenAI(prompt, apiKey) {
 }
 
 function displayQuiz(quiz) {
+    stopSpeaking(); // 新しい問題が表示されたら読み上げを停止
     currentQuiz = quiz;
     questionText.textContent = quiz.question;
     optionsContainer.innerHTML = '';
 
     // バッジにカテゴリ情報も表示
-    const examLabel = quiz.exam === 'sme' ? '診断士' : 'FP1';
+    const examLabel = quiz.exam === 'sme' ? '診断士' : (quiz.exam === 'fp1' ? 'FP1' : '税理士');
     engineBadge.textContent = isReviewMode ? `復習: [${examLabel}] ${quiz.category}` : engineBadge.textContent;
 
     quiz.options.forEach((option, index) => {
@@ -525,6 +570,14 @@ function updateStatsAndMistakes(isCorrect) {
     stats.categories[catKey].total += 1;
     if (isCorrect) stats.categories[catKey].correct += 1;
 
+    // 1.5 日別履歴（問題数・時間）の記録
+    const todayStr = getTodayString();
+    if (!stats.dailyHistory) stats.dailyHistory = {};
+    if (!stats.dailyHistory[todayStr]) {
+        stats.dailyHistory[todayStr] = { count: 0, time: 0 };
+    }
+    stats.dailyHistory[todayStr].count += 1;
+
     localStorage.setItem('quagenius_stats', JSON.stringify(stats));
 
     // 2. 復習ストックの更新
@@ -547,11 +600,24 @@ function updateStatsAndMistakes(isCorrect) {
 function renderStats() {
     const totalStat = document.getElementById('totalQuestionsStat');
     const accStat = document.getElementById('overallAccuracyStat');
+    const todayStudyTimeStat = document.getElementById('todayStudyTimeStat');
     const list = document.getElementById('categoryStatsList');
 
     totalStat.textContent = stats.total;
     const overallAcc = stats.total > 0 ? Math.round((stats.correct / stats.total) * 100) : 0;
     accStat.textContent = `${overallAcc}%`;
+
+    // 本日の学習時間の表示を更新
+    const todayStr = getTodayString();
+    const todayData = (stats.dailyHistory && stats.dailyHistory[todayStr]) || { time: 0 };
+    const todayMin = Math.floor(todayData.time / 60);
+    const todaySec = todayData.time % 60;
+    if (todayStudyTimeStat) {
+        todayStudyTimeStat.textContent = `${todayMin}分 ${todaySec}秒`;
+    }
+
+    // 週次グラフのレンダリング
+    renderWeeklyChart();
 
     list.innerHTML = '';
 
@@ -568,7 +634,7 @@ function renderStats() {
 
     sortedCats.forEach(([catKey, data]) => {
         const [exam, cat] = catKey.split('_');
-        const examName = exam === 'sme' ? '診断士' : 'FP1';
+        const examName = exam === 'sme' ? '診断士' : (exam === 'fp1' ? 'FP1' : '税理士');
         const acc = Math.round((data.correct / data.total) * 100);
         
         let color = 'var(--error-color)';
@@ -588,6 +654,129 @@ function renderStats() {
         `;
         list.appendChild(item);
     });
+}
+
+// --- 音声読み上げ & 学習時間 & グラフ ヘルパー関数 ---
+
+function getTodayString() {
+    const d = new Date();
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+}
+
+function updateTodayStudyTimeData() {
+    const todayStr = getTodayString();
+    if (!stats.dailyHistory) stats.dailyHistory = {};
+    if (!stats.dailyHistory[todayStr]) {
+        stats.dailyHistory[todayStr] = { count: 0, time: 0 };
+    }
+    stats.dailyHistory[todayStr].time += 1;
+    
+    // 5秒ごとにlocalStorageに保存してパフォーマンスを維持
+    if (sessionSeconds % 5 === 0) {
+        localStorage.setItem('quagenius_stats', JSON.stringify(stats));
+    }
+}
+
+function startSpeaking() {
+    if (!currentQuiz || !currentQuiz.explanation) return;
+    window.speechSynthesis.cancel(); // 進行中の音声を停止
+
+    // Markdown解説からプレーンテキストを抽出
+    let textToSpeak = `解説を読み上げます。${currentQuiz.explanation}`;
+    textToSpeak = textToSpeak
+        .replace(/#+/g, '') // ヘッダー記号の削除
+        .replace(/\*+/g, '') // 太字記号の削除
+        .replace(/`+/g, '')  // コード記号の削除
+        .replace(/【/g, '\n【') // セクション前での改行
+        .replace(/適切/g, 'てきせつ')
+        .replace(/不適切/g, 'ふてきせつ');
+
+    const utterance = new SpeechSynthesisUtterance(textToSpeak);
+    utterance.lang = 'ja-JP';
+    utterance.rate = 1.0;
+
+    utterance.onend = () => {
+        isSpeaking = false;
+        ttsBtn.querySelector('.btn-text').textContent = '🔊 解説を読み上げる';
+    };
+    utterance.onerror = () => {
+        isSpeaking = false;
+        ttsBtn.querySelector('.btn-text').textContent = '🔊 解説を読み上げる';
+    };
+
+    window.speechSynthesis.speak(utterance);
+    isSpeaking = true;
+    ttsBtn.querySelector('.btn-text').textContent = '⏹ 読み上げを停止';
+}
+
+function stopSpeaking() {
+    window.speechSynthesis.cancel();
+    isSpeaking = false;
+    if (ttsBtn) {
+        const btnTextSpan = ttsBtn.querySelector('.btn-text');
+        if (btnTextSpan) {
+            btnTextSpan.textContent = '🔊 解説を読み上げる';
+        }
+    }
+}
+
+function renderWeeklyChart() {
+    const chartContainer = document.getElementById('weeklyChartContainer');
+    if (!chartContainer) return;
+    chartContainer.innerHTML = '';
+
+    // 直近7日間の日付配列を生成 (今日を含む)
+    const days = [];
+    for (let i = 6; i >= 0; i--) {
+        const d = new Date();
+        d.setDate(d.getDate() - i);
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        const dateStr = `${y}-${m}-${day}`;
+        const labelStr = `${d.getMonth() + 1}/${d.getDate()}`;
+        days.push({ dateStr, labelStr });
+    }
+
+    // グラフの最大高さを決めるスケール (最低でも30分=1800秒を基準値の分母にする)
+    let maxTime = 1800;
+    days.forEach(day => {
+        const hist = stats.dailyHistory[day.dateStr] || { time: 0 };
+        if (hist.time > maxTime) {
+            maxTime = hist.time;
+        }
+    });
+
+    const chartDiv = document.createElement('div');
+    chartDiv.className = 'weekly-chart';
+
+    const barsDiv = document.createElement('div');
+    barsDiv.className = 'chart-bars';
+
+    days.forEach(day => {
+        const hist = stats.dailyHistory[day.dateStr] || { count: 0, time: 0 };
+        const minutes = Math.round(hist.time / 60);
+        const percent = Math.min(100, Math.max(0, (hist.time / maxTime) * 100));
+
+        const wrapper = document.createElement('div');
+        wrapper.className = 'chart-bar-wrapper';
+
+        const valueText = minutes > 0 ? `${minutes}分` : '0分';
+        const tooltipText = `${hist.count}問完了 (学習時間: ${valueText})`;
+
+        wrapper.innerHTML = `
+            <div class="chart-bar-value">${valueText}</div>
+            <div class="chart-bar" style="height: ${percent}%;" title="${tooltipText}"></div>
+            <div class="chart-bar-label">${day.labelStr}</div>
+        `;
+        barsDiv.appendChild(wrapper);
+    });
+
+    chartDiv.appendChild(barsDiv);
+    chartContainer.appendChild(chartDiv);
 }
 
 // Start app

@@ -34,6 +34,7 @@
                         <select id="examSelect">
                             <option value="sme">中小企業診断士</option>
                             <option value="fp1">FP1級</option>
+                            <option value="tax">税理士</option>
                         </select>
                     </div>
                 </div>
@@ -88,6 +89,15 @@
                     <h3 id="resultTitle">結果</h3>
                 </div>
                 
+                <div class="result-actions" style="display: flex; gap: 0.8rem; margin-bottom: 1rem;">
+                    <button id="ttsBtn" class="secondary-btn" style="flex: 1; font-size: 0.9rem; padding: 0.6rem;">
+                        <span class="btn-text">🔊 解説を読み上げる</span>
+                    </button>
+                    <button id="printBtn" class="secondary-btn" style="flex: 1; font-size: 0.9rem; padding: 0.6rem;">
+                        <span class="btn-text">📄 PDFとして保存 / 印刷</span>
+                    </button>
+                </div>
+                
                 <div class="explanation-box">
                     <h4>解説</h4>
                     <div id="explanationText" class="markdown-body"></div>
@@ -138,7 +148,7 @@
 
     <!-- Stats Modal -->
     <div id="statsModal" class="modal hidden">
-        <div class="modal-content glass-card stats-modal-content">
+        <div class="modal-content glass-card stats-modal-content" style="max-width: 600px;">
             <div class="modal-header">
                 <h2>📊 成績・統計ダッシュボード</h2>
                 <button id="closeStatsBtn" class="icon-btn">✖</button>
@@ -152,6 +162,18 @@
                 <div class="stat-box">
                     <div class="stat-label">総合正答率</div>
                     <div class="stat-value" id="overallAccuracyStat">0%</div>
+                </div>
+                <div class="stat-box" style="grid-column: span 2;">
+                    <div class="stat-label">⏱ 本日の学習時間</div>
+                    <div class="stat-value" id="todayStudyTimeStat">0分 0秒</div>
+                </div>
+            </div>
+
+            <!-- Weekly Progress Chart -->
+            <div class="stats-details mt-4">
+                <h3>📈 直近7日間の学習状況</h3>
+                <div id="weeklyChartContainer" class="weekly-chart-container mt-2">
+                    <!-- JSで動的に棒グラフを描画 -->
                 </div>
             </div>
 
