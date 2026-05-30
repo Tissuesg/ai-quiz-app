@@ -94,6 +94,8 @@ const nextBtnText = nextBtn.querySelector('.btn-text');
 const nextBtnSpinner = nextBtn.querySelector('.spinner');
 const ttsBtn = document.getElementById('ttsBtn');
 const printBtn = document.getElementById('printBtn');
+const ttsSpeed = document.getElementById('ttsSpeed');
+const ttsSpeedVal = document.getElementById('ttsSpeedVal');
 
 // Initialize
 function init() {
@@ -268,6 +270,24 @@ function init() {
     printBtn.addEventListener('click', () => {
         window.print();
     });
+
+    // 読み上げ速度スライダーの監視
+    if (ttsSpeed) {
+        // ドラッグ中はテキスト表示のみ更新
+        ttsSpeed.addEventListener('input', () => {
+            const speed = parseFloat(ttsSpeed.value).toFixed(1);
+            if (ttsSpeedVal) {
+                ttsSpeedVal.textContent = `${speed}x`;
+            }
+        });
+
+        // ドラッグ完了時（指を離した時）に、再生中なら新しい速度で再起動
+        ttsSpeed.addEventListener('change', () => {
+            if (isSpeaking) {
+                startSpeaking(); // 新しい速度で再スタート
+            }
+        });
+    }
 
     // 学習時間トラッキングタイマーの開始 (1秒ごと)
     setInterval(() => {
@@ -696,7 +716,10 @@ function startSpeaking() {
 
     const utterance = new SpeechSynthesisUtterance(textToSpeak);
     utterance.lang = 'ja-JP';
-    utterance.rate = 1.0;
+    
+    // 速度調整スライダーから値を取得
+    const speed = ttsSpeed ? parseFloat(ttsSpeed.value) : 1.0;
+    utterance.rate = speed;
 
     utterance.onend = () => {
         isSpeaking = false;

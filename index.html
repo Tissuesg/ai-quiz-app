@@ -89,11 +89,19 @@
                     <h3 id="resultTitle">結果</h3>
                 </div>
                 
-                <div class="result-actions" style="display: flex; gap: 0.8rem; margin-bottom: 1rem;">
-                    <button id="ttsBtn" class="secondary-btn" style="flex: 1; font-size: 0.9rem; padding: 0.6rem;">
+                <div class="result-actions" style="display: flex; flex-wrap: wrap; gap: 0.8rem; margin-bottom: 1rem; align-items: center;">
+                    <button id="ttsBtn" class="secondary-btn" style="flex: 1; min-width: 150px; font-size: 0.9rem; padding: 0.6rem;">
                         <span class="btn-text">🔊 解説を読み上げる</span>
                     </button>
-                    <button id="printBtn" class="secondary-btn" style="flex: 1; font-size: 0.9rem; padding: 0.6rem;">
+                    
+                    <!-- 音声読み上げ速度コントローラー -->
+                    <div class="tts-speed-control" style="display: flex; align-items: center; gap: 0.5rem; background: rgba(255,255,255,0.05); padding: 0.4rem 0.8rem; border-radius: 0.5rem; border: 1px solid var(--card-border); flex: 1.2; min-width: 180px;">
+                        <span style="font-size: 0.8rem; color: var(--text-secondary); white-space: nowrap;">⚡ 速度:</span>
+                        <input type="range" id="ttsSpeed" min="0.5" max="2.0" step="0.1" value="1.0" style="width: 100%; accent-color: var(--primary-color); cursor: pointer; height: 6px; padding: 0; background: transparent; border: none; margin: 0;">
+                        <span id="ttsSpeedVal" style="font-size: 0.8rem; font-weight: bold; min-width: 2.2rem; text-align: right;">1.0x</span>
+                    </div>
+
+                    <button id="printBtn" class="secondary-btn" style="flex: 1; min-width: 150px; font-size: 0.9rem; padding: 0.6rem;">
                         <span class="btn-text">📄 PDFとして保存 / 印刷</span>
                     </button>
                 </div>
@@ -148,40 +156,51 @@
 
     <!-- Stats Modal -->
     <div id="statsModal" class="modal hidden">
-        <div class="modal-content glass-card stats-modal-content" style="max-width: 600px;">
+        <div class="modal-content glass-card stats-modal-content" style="max-width: 850px; width: 100%;">
             <div class="modal-header">
                 <h2>📊 成績・統計ダッシュボード</h2>
                 <button id="closeStatsBtn" class="icon-btn">✖</button>
             </div>
             
-            <div class="stats-overview mt-4">
-                <div class="stat-box">
-                    <div class="stat-label">総出題数</div>
-                    <div class="stat-value" id="totalQuestionsStat">0</div>
-                </div>
-                <div class="stat-box">
-                    <div class="stat-label">総合正答率</div>
-                    <div class="stat-value" id="overallAccuracyStat">0%</div>
-                </div>
-                <div class="stat-box" style="grid-column: span 2;">
-                    <div class="stat-label">⏱ 本日の学習時間</div>
-                    <div class="stat-value" id="todayStudyTimeStat">0分 0秒</div>
-                </div>
-            </div>
+            <!-- 2カラムレイアウト用のグリッドコンテナ -->
+            <div id="statsDashboardGrid" class="stats-dashboard-grid mt-4">
+                
+                <!-- 左カラム: 実績値 & グラフ -->
+                <div class="stats-left-col">
+                    <div class="stats-overview">
+                        <div class="stat-box">
+                            <div class="stat-label">総出題数</div>
+                            <div class="stat-value" id="totalQuestionsStat">0</div>
+                        </div>
+                        <div class="stat-box">
+                            <div class="stat-label">総合正答率</div>
+                            <div class="stat-value" id="overallAccuracyStat">0%</div>
+                        </div>
+                        <div class="stat-box" style="grid-column: span 2;">
+                            <div class="stat-label">⏱ 本日の学習時間</div>
+                            <div class="stat-value" id="todayStudyTimeStat">0分 0秒</div>
+                        </div>
+                    </div>
 
-            <!-- Weekly Progress Chart -->
-            <div class="stats-details mt-4">
-                <h3>📈 直近7日間の学習状況</h3>
-                <div id="weeklyChartContainer" class="weekly-chart-container mt-2">
-                    <!-- JSで動的に棒グラフを描画 -->
+                    <!-- Weekly Progress Chart -->
+                    <div class="stats-details mt-4">
+                        <h3>📈 直近7日間の学習状況</h3>
+                        <div id="weeklyChartContainer" class="weekly-chart-container mt-2">
+                            <!-- JSで動的に棒グラフを描画 -->
+                        </div>
+                    </div>
                 </div>
-            </div>
 
-            <div class="stats-details mt-4">
-                <h3>分野別の成績</h3>
-                <div id="categoryStatsList" class="category-stats-list">
-                    <!-- Populated by JS -->
+                <!-- 右カラム: 分野別成績 -->
+                <div class="stats-right-col">
+                    <div class="stats-details">
+                        <h3>分野別の成績</h3>
+                        <div id="categoryStatsList" class="category-stats-list mt-2">
+                            <!-- Populated by JS -->
+                        </div>
+                    </div>
                 </div>
+
             </div>
             
             <div class="modal-actions mt-4 border-top pt-4">

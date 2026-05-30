@@ -585,6 +585,70 @@ select:focus, input:focus {
     }
 }
 
+/* --- Stats Dashboard Grid Styles --- */
+.stats-dashboard-grid {
+    display: grid;
+    grid-template-columns: 1.2fr 1fr;
+    gap: 1.5rem;
+    align-items: start;
+}
+
+.stats-left-col {
+    display: flex;
+    flex-direction: column;
+    gap: 1.2rem;
+}
+
+.stats-right-col {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
+.stats-right-col .category-stats-list {
+    max-height: 380px; /* 大画面では少し縦長にスクロールできるよう拡張 */
+}
+
+/* --- TTS Speed Control Slider Styling --- */
+.tts-speed-control input[type="range"] {
+    -webkit-appearance: none;
+    appearance: none;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 3px;
+    outline: none;
+}
+
+.tts-speed-control input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: var(--primary-color);
+    cursor: pointer;
+    transition: transform 0.15s, background-color 0.15s;
+}
+
+.tts-speed-control input[type="range"]::-webkit-slider-thumb:hover {
+    transform: scale(1.3);
+    background: var(--primary-hover);
+}
+
+.tts-speed-control input[type="range"]::-moz-range-thumb {
+    width: 14px;
+    height: 14px;
+    border: none;
+    border-radius: 50%;
+    background: var(--primary-color);
+    cursor: pointer;
+    transition: transform 0.15s, background-color 0.15s;
+}
+
+.tts-speed-control input[type="range"]::-moz-range-thumb:hover {
+    transform: scale(1.3);
+    background: var(--primary-hover);
+}
+
 /* --- Weekly Progress Chart Styles --- */
 .weekly-chart-container {
     background: rgba(0, 0, 0, 0.2);
@@ -739,3 +803,26 @@ select:focus, input:focus {
     }
 }
 
+/* --- Mobile Responsive Optimizations for Dashboard --- */
+@media (max-width: 768px) {
+    .stats-dashboard-grid {
+        grid-template-columns: 1fr;
+        gap: 1.2rem;
+    }
+    
+    .stats-right-col .category-stats-list {
+        max-height: 240px; /* スマホではスクロール範囲を狭めて画面外突き抜けを防ぐ */
+    }
+    
+    .stats-modal-content {
+        padding: 1.2rem !important;
+        max-height: 95vh;
+        overflow-y: auto;
+    }
+
+    .tts-speed-control {
+        order: 3; /* スマホではスライダーを折りたたみの最後に配置してバランスをとる */
+        width: 100%;
+        flex: none !important;
+    }
+}
