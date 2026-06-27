@@ -826,3 +826,55 @@ select:focus, input:focus {
         flex: none !important;
     }
 }
+
+
+/* PC環境（画面幅が769pxより大きい場合）向けの調整 */
+@media (min-width: 769px) {
+    #app {
+        max-width: 1400px;
+        padding: 3rem 2rem;
+        margin: 0 auto; /* 画面中央に配置します */
+    }
+
+    body {
+        font-size: 20px; /* 24pxだと大きすぎてレイアウト崩れしやすいため、20pxを推奨します */
+    }
+
+    .glass-card {
+        padding: 2.5rem;
+    }
+
+    /* 以下、文字サイズ拡大による崩れを防ぐための追加設定 */
+    #questionText {
+        font-size: 1.5rem; /* 問題文を大きく */
+    }
+
+    .option-btn {
+        padding: 1.2rem 1.5rem;
+        font-size: 1.1rem; /* 選択肢を読みやすく */
+    }
+
+    /* ロゴの調整 */
+    .logo {
+        font-size: 2rem;
+    }
+}
+
+@media (min-width: 769px) {
+    /* フォームの枠自体を少し大きくする */
+    .glass-card {
+        padding: 3rem !important; /* 内側の余白を広げる */
+        min-width: 600px;         /* 最小幅をしっかり確保する */
+    }
+
+    /* フォーム内の各項目の間隔を広げる */
+    .controls-section {
+        gap: 2.5rem !important;
+    }
+    
+    /* 選択肢やボタンのサイズを少しだけ大きくする */
+    select, input, .primary-btn {
+        padding: 1.2rem 1.5rem !important;
+        font-size: 1.1rem !important;
+    }
+}
