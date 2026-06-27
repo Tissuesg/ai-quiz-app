@@ -835,7 +835,7 @@ select:focus, input:focus {
 
     /* フォントサイズをPC向けに少し大きくする */
     body {
-        font-size: 18px;
+        font-size: 24px;
     }
 
     /* 必要に応じて、カード内の入力項目やボタンも大きくする */
