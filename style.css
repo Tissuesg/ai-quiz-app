@@ -34,7 +34,7 @@ body {
 
 #app {
     width: 100%;
-    max-width: 1800px;
+    max-width: 1200px;
     padding: 2rem 1.5rem;
     display: flex;
     flex-direction: column;
@@ -824,5 +824,22 @@ select:focus, input:focus {
         order: 3; /* スマホではスライダーを折りたたみの最後に配置してバランスをとる */
         width: 100%;
         flex: none !important;
+    }
+}
+/* PC環境（画面幅が769pxより大きい場合）向けの調整 */
+@media (min-width: 769px) {
+    #app {
+        max-width: 1400px; /* あまり広げすぎず、視認性の良い範囲に留める */
+        padding: 3rem 2rem; /* 余白を増やしてゆとりを持たせる */
+    }
+
+    /* フォントサイズをPC向けに少し大きくする */
+    body {
+        font-size: 18px;
+    }
+
+    /* 必要に応じて、カード内の入力項目やボタンも大きくする */
+    .glass-card {
+        padding: 2.5rem;
     }
 }
