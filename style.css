@@ -826,20 +826,35 @@ select:focus, input:focus {
         flex: none !important;
     }
 }
+
 /* PC環境（画面幅が769pxより大きい場合）向けの調整 */
 @media (min-width: 769px) {
     #app {
-        max-width: 1400px; /* あまり広げすぎず、視認性の良い範囲に留める */
-        padding: 3rem 2rem; /* 余白を増やしてゆとりを持たせる */
+        max-width: 1400px;
+        padding: 3rem 2rem;
+        margin: 0 auto; /* 画面中央に配置します */
     }
 
-    /* フォントサイズをPC向けに少し大きくする */
     body {
-        font-size: 24px;
+        font-size: 20px; /* 24pxだと大きすぎてレイアウト崩れしやすいため、20pxを推奨します */
     }
 
-    /* 必要に応じて、カード内の入力項目やボタンも大きくする */
     .glass-card {
         padding: 2.5rem;
+    }
+
+    /* 以下、文字サイズ拡大による崩れを防ぐための追加設定 */
+    #questionText {
+        font-size: 1.5rem; /* 問題文を大きく */
+    }
+
+    .option-btn {
+        padding: 1.2rem 1.5rem;
+        font-size: 1.1rem; /* 選択肢を読みやすく */
+    }
+
+    /* ロゴの調整 */
+    .logo {
+        font-size: 2rem;
     }
 }
