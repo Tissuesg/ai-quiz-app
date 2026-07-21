@@ -33,6 +33,23 @@ const EXAM_DATA = {
             "相続税法",
             "消費税法"
         ]
+    },
+    itpass: {
+        name: "ITパスポート",
+        categories: [
+            "ストラテジ系",
+            "マネジメント系",
+            "テクノロジ系"
+        ]
+    },
+    takken: {
+        name: "宅地建物取引士",
+        categories: [
+            "権利関係",
+            "宅建業法",
+            "法令上の制限",
+            "税・その他"
+        ]
     }
 };
 
@@ -523,7 +540,11 @@ function displayQuiz(quiz) {
     optionsContainer.innerHTML = '';
 
     // バッジにカテゴリ情報も表示
-    const examLabel = quiz.exam === 'sme' ? '診断士' : (quiz.exam === 'fp1' ? 'FP1' : '税理士');
+    const examLabel = quiz.exam === 'sme' ? '診断士' : 
+                      (quiz.exam === 'fp1' ? 'FP1' : 
+                      (quiz.exam === 'tax' ? '税理士' : 
+                      (quiz.exam === 'itpass' ? 'ITパス' : 
+                      (quiz.exam === 'takken' ? '宅建' : ''))));
     engineBadge.textContent = isReviewMode ? `復習: [${examLabel}] ${quiz.category}` : engineBadge.textContent;
 
     quiz.options.forEach((option, index) => {
@@ -654,7 +675,11 @@ function renderStats() {
 
     sortedCats.forEach(([catKey, data]) => {
         const [exam, cat] = catKey.split('_');
-        const examName = exam === 'sme' ? '診断士' : (exam === 'fp1' ? 'FP1' : '税理士');
+        const examName = exam === 'sme' ? '診断士' : 
+                         (exam === 'fp1' ? 'FP1' : 
+                         (exam === 'tax' ? '税理士' : 
+                         (exam === 'itpass' ? 'ITパス' : 
+                         (exam === 'takken' ? '宅建' : ''))));
         const acc = Math.round((data.correct / data.total) * 100);
         
         let color = 'var(--error-color)';
