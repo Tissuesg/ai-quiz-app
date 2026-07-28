@@ -77,8 +77,12 @@ const statsModal = document.getElementById('statsModal');
 
 const engineRadios = document.getElementsByName('aiEngine');
 const geminiKeyGroup = document.getElementById('geminiKeyGroup');
+const groqKeyGroup = document.getElementById('groqKeyGroup');
+const openrouterKeyGroup = document.getElementById('openrouterKeyGroup');
 const openaiKeyGroup = document.getElementById('openaiKeyGroup');
 const geminiApiKeyInput = document.getElementById('geminiApiKeyInput');
+const groqApiKeyInput = document.getElementById('groqApiKeyInput');
+const openrouterApiKeyInput = document.getElementById('openrouterApiKeyInput');
 const openaiApiKeyInput = document.getElementById('openaiApiKeyInput');
 const saveApiBtn = document.getElementById('saveApiBtn');
 const toast = document.getElementById('toast');
@@ -119,9 +123,13 @@ function init() {
     // Load Settings
     const engine = localStorage.getItem('ai_engine') || 'gemini';
     const geminiKey = localStorage.getItem('gemini_api_key') || '';
+    const groqKey = localStorage.getItem('groq_api_key') || '';
+    const openrouterKey = localStorage.getItem('openrouter_api_key') || '';
     const openaiKey = localStorage.getItem('openai_api_key') || '';
     
     geminiApiKeyInput.value = geminiKey;
+    if (groqApiKeyInput) groqApiKeyInput.value = groqKey;
+    if (openrouterApiKeyInput) openrouterApiKeyInput.value = openrouterKey;
     openaiApiKeyInput.value = openaiKey;
 
     engineRadios.forEach(r => {
@@ -130,7 +138,7 @@ function init() {
     });
     updateApiModalUI();
 
-    if (!geminiKey && !openaiKey) {
+    if (!geminiKey && !groqKey && !openrouterKey && !openaiKey) {
         apiModal.classList.remove('hidden');
     }
 
@@ -324,22 +332,23 @@ function updateReviewBtnState() {
 
 function updateApiModalUI() {
     const selectedEngine = Array.from(engineRadios).find(r => r.checked).value;
-    if (selectedEngine === 'gemini') {
-        geminiKeyGroup.classList.remove('hidden');
-        openaiKeyGroup.classList.add('hidden');
-    } else {
-        geminiKeyGroup.classList.add('hidden');
-        openaiKeyGroup.classList.remove('hidden');
-    }
+    if (geminiKeyGroup) geminiKeyGroup.classList.toggle('hidden', selectedEngine !== 'gemini');
+    if (groqKeyGroup) groqKeyGroup.classList.toggle('hidden', selectedEngine !== 'groq');
+    if (openrouterKeyGroup) openrouterKeyGroup.classList.toggle('hidden', selectedEngine !== 'openrouter');
+    if (openaiKeyGroup) openaiKeyGroup.classList.toggle('hidden', selectedEngine !== 'openai');
 }
 
 function saveApiSettings() {
     const selectedEngine = Array.from(engineRadios).find(r => r.checked).value;
     const gKey = geminiApiKeyInput.value.trim();
+    const groqKey = groqApiKeyInput ? groqApiKeyInput.value.trim() : '';
+    const openrouterKey = openrouterApiKeyInput ? openrouterApiKeyInput.value.trim() : '';
     const oKey = openaiApiKeyInput.value.trim();
 
     localStorage.setItem('ai_engine', selectedEngine);
     if (gKey) localStorage.setItem('gemini_api_key', gKey);
+    if (groqKey) localStorage.setItem('groq_api_key', groqKey);
+    if (openrouterKey) localStorage.setItem('openrouter_api_key', openrouterKey);
     if (oKey) localStorage.setItem('openai_api_key', oKey);
 
     apiModal.classList.add('hidden');
@@ -403,7 +412,13 @@ async function fetchQuizData() {
     const isCalcMode = calcOptionCheckbox.checked;
     const examName = EXAM_DATA[currentExam].name;
 
-    engineBadge.textContent = engine === 'gemini' ? 'Gemini 2.5' : 'GPT-4o-mini';
+    const badgeNames = {
+        gemini: 'Gemini 2.5',
+        groq: 'Groq (Llama 3.3)',
+        openrouter: 'OpenRouter (Free)',
+        openai: 'GPT-4o-mini'
+    };
+    engineBadge.textContent = badgeNames[engine] || 'Gemini 2.5';
 
     let prompt = `あなたは「${examName}」の専門講師です。
 以下の要件に従って、「${currentCategory}」分野の本試験レベルの4択問題を1問作成してください。
@@ -455,6 +470,10 @@ async function fetchQuizData() {
 
     if (engine === 'gemini') {
         return await fetchWithRetry(fetchGemini);
+    } else if (engine === 'groq') {
+        return await fetchWithRetry(fetchGroq);
+    } else if (engine === 'openrouter') {
+        return await fetchWithRetry(fetchOpenRouter);
     } else {
         return await fetchWithRetry(fetchOpenAI);
     }
@@ -525,6 +544,64 @@ async function fetchOpenAI(prompt, apiKey) {
     if (!response.ok) {
         if (response.status === 429) throw new Error('RATE_LIMIT');
         throw new Error(`OpenAI API Error: ${response.status}`);
+    }
+    const data = await response.json();
+    let quiz = parseRobustJSON(data.choices[0].message.content);
+    quiz.exam = currentExam;
+    quiz.category = currentCategory;
+    return quiz;
+}
+
+async function fetchGroq(prompt, apiKey) {
+    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${apiKey}`
+        },
+        body: JSON.stringify({
+            model: 'llama-3.3-70b-versatile',
+            response_format: { type: "json_object" },
+            messages: [
+                { role: "system", "content": "You are a strict JSON output generator for educational quizzes." },
+                { role: "user", "content": prompt }
+            ],
+            temperature: 0.7
+        })
+    });
+
+    if (!response.ok) {
+        if (response.status === 429) throw new Error('RATE_LIMIT');
+        throw new Error(`Groq API Error: ${response.status}`);
+    }
+    const data = await response.json();
+    let quiz = parseRobustJSON(data.choices[0].message.content);
+    quiz.exam = currentExam;
+    quiz.category = currentCategory;
+    return quiz;
+}
+
+async function fetchOpenRouter(prompt, apiKey) {
+    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${apiKey}`
+        },
+        body: JSON.stringify({
+            model: 'meta-llama/llama-3.3-70b-instruct:free',
+            response_format: { type: "json_object" },
+            messages: [
+                { role: "system", "content": "You are a strict JSON output generator for educational quizzes." },
+                { role: "user", "content": prompt }
+            ],
+            temperature: 0.7
+        })
+    });
+
+    if (!response.ok) {
+        if (response.status === 429) throw new Error('RATE_LIMIT');
+        throw new Error(`OpenRouter API Error: ${response.status}`);
     }
     const data = await response.json();
     let quiz = parseRobustJSON(data.choices[0].message.content);

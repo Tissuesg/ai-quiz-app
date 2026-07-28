@@ -18,7 +18,7 @@
     <div id="app">
         <header>
             <div class="logo">
-                <span class="icon">✨</span> <span class="logo-text">QuaGenius</span> <span class="version-badge">v1.8</span>
+                <span class="icon">✨</span> <span class="logo-text">QuaGenius</span> <span class="version-badge">v1.10</span>
             </div>
             <div class="header-actions">
                 <button id="statsBtn" class="icon-btn" title="成績・統計">📊</button>
@@ -127,10 +127,18 @@
             <h2>初期設定・API選択</h2>
             <p class="modal-desc">問題生成に使用するAIエンジンを選択し、APIキーを入力してください。キーはブラウザに安全に保存されます。</p>
             
-            <div class="engine-toggle">
+            <div class="engine-toggle" style="display: flex; flex-direction: column; gap: 0.6rem;">
                 <label class="radio-label">
                     <input type="radio" name="aiEngine" value="gemini" checked>
-                    <span>Gemini 2.5 Flash (推奨・高速)</span>
+                    <span>Gemini 2.5 Flash (推奨・無料枠あり)</span>
+                </label>
+                <label class="radio-label">
+                    <input type="radio" name="aiEngine" value="groq">
+                    <span>Groq [Llama 3.3 70B] (爆速・無料枠あり)</span>
+                </label>
+                <label class="radio-label">
+                    <input type="radio" name="aiEngine" value="openrouter">
+                    <span>OpenRouter [Free Model] (無料枠あり)</span>
                 </label>
                 <label class="radio-label">
                     <input type="radio" name="aiEngine" value="openai">
@@ -142,6 +150,18 @@
                 <label for="geminiApiKeyInput">Google Gemini API Key</label>
                 <input type="password" id="geminiApiKeyInput" placeholder="AIzaSy...">
                 <a href="https://aistudio.google.com/app/apikey" target="_blank" class="link-btn text-small mt-2">APIキーを取得する (無料)</a>
+            </div>
+
+            <div class="input-group mt-4 hidden" id="groqKeyGroup">
+                <label for="groqApiKeyInput">Groq API Key</label>
+                <input type="password" id="groqApiKeyInput" placeholder="gsk_...">
+                <a href="https://console.groq.com/keys" target="_blank" class="link-btn text-small mt-2">APIキーを取得する (無料)</a>
+            </div>
+
+            <div class="input-group mt-4 hidden" id="openrouterKeyGroup">
+                <label for="openrouterApiKeyInput">OpenRouter API Key</label>
+                <input type="password" id="openrouterApiKeyInput" placeholder="sk-or-v1-...">
+                <a href="https://openrouter.ai/keys" target="_blank" class="link-btn text-small mt-2">APIキーを取得する (無料)</a>
             </div>
 
             <div class="input-group mt-4 hidden" id="openaiKeyGroup">
