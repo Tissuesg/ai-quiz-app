@@ -479,23 +479,46 @@ async function fetchQuizData() {
     }
 }
 
-// AIが余計な文字（マークダウン等）を含めても強制的にJSONを抽出する関数
+// AIが余計な文字（思考ログ<think>やマークダウン等）を含めても強制的にJSONを抽出・整形する関数
 function parseRobustJSON(text) {
+    if (!text || typeof text !== 'string') {
+        throw new Error('Empty or non-string response');
+    }
+
+    // 1. DeepSeek R1等の思考ブロック <think>...</think> を削除
+    let cleaned = text.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
+
+    // 2. マークダウンコードブロック ```json ... ``` から中身を取り出す
+    const match = cleaned.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
+    if (match) {
+        cleaned = match[1].trim();
+    } else {
+        // 最も外側の { から } を抽出
+        const start = cleaned.indexOf('{');
+        const end = cleaned.lastIndexOf('}');
+        if (start !== -1 && end !== -1 && end > start) {
+            cleaned = cleaned.substring(start, end + 1);
+        }
+    }
+
+    // 1回目のパース試行
     try {
-        return JSON.parse(text);
-    } catch (e) {
-        // マークダウンブロック ```json ... ``` を取り除く
-        const match = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
-        if (match) {
-            return JSON.parse(match[1]);
+        return JSON.parse(cleaned);
+    } catch (e1) {
+        // 2回目の試行：文字列内の生の改行やタブ・特殊制御文字を自動補正
+        try {
+            const sanitized = cleaned
+                .replace(/[\u0000-\u001F]+/g, (c) => {
+                    if (c === '\n') return '\\n';
+                    if (c === '\r') return '\\r';
+                    if (c === '\t') return '\\t';
+                    return '';
+                });
+            return JSON.parse(sanitized);
+        } catch (e2) {
+            console.error('Raw LLM response parsing failed:', text);
+            throw new Error('JSON parsing failed completely');
         }
-        // それでもダメなら最初の { から最後の } までを抽出
-        const start = text.indexOf('{');
-        const end = text.lastIndexOf('}');
-        if (start !== -1 && end !== -1) {
-            return JSON.parse(text.substring(start, end + 1));
-        }
-        throw new Error('JSON parsing failed completely');
     }
 }
 
@@ -582,32 +605,60 @@ async function fetchGroq(prompt, apiKey) {
 }
 
 async function fetchOpenRouter(prompt, apiKey) {
-    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${apiKey}`
-        },
-        body: JSON.stringify({
-            model: 'meta-llama/llama-3.3-70b-instruct:free',
-            response_format: { type: "json_object" },
-            messages: [
-                { role: "system", "content": "You are a strict JSON output generator for educational quizzes." },
-                { role: "user", "content": prompt }
-            ],
-            temperature: 0.7
-        })
-    });
+    // OpenRouterの無料モデルリスト（順次フォールバック）
+    const freeModels = [
+        'meta-llama/llama-3.3-70b-instruct:free',
+        'google/gemma-2-9b-it:free',
+        'qwen/qwen-2.5-72b-instruct:free',
+        'deepseek/deepseek-r1:free'
+    ];
 
-    if (!response.ok) {
-        if (response.status === 429) throw new Error('RATE_LIMIT');
-        throw new Error(`OpenRouter API Error: ${response.status}`);
+    let lastError = null;
+
+    for (const model of freeModels) {
+        try {
+            const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${apiKey}`,
+                    'HTTP-Referer': window.location.origin || 'http://localhost',
+                    'X-Title': 'QuaGenius'
+                },
+                body: JSON.stringify({
+                    model: model,
+                    messages: [
+                        { role: "system", "content": "You are a strict JSON output generator for educational quizzes. Output ONLY valid JSON." },
+                        { role: "user", "content": prompt }
+                    ],
+                    temperature: 0.7
+                })
+            });
+
+            if (!response.ok) {
+                if (response.status === 429) throw new Error('RATE_LIMIT');
+                console.warn(`OpenRouter model ${model} failed with status ${response.status}. Trying fallback...`);
+                continue;
+            }
+
+            const data = await response.json();
+            if (!data.choices || !data.choices[0] || !data.choices[0].message || !data.choices[0].message.content) {
+                console.warn(`OpenRouter model ${model} returned empty payload. Trying fallback...`);
+                continue;
+            }
+
+            let quiz = parseRobustJSON(data.choices[0].message.content);
+            quiz.exam = currentExam;
+            quiz.category = currentCategory;
+            return quiz;
+        } catch (e) {
+            if (e.message === 'RATE_LIMIT') throw e;
+            lastError = e;
+            console.warn(`OpenRouter model ${model} failed: ${e.message}. Trying next fallback model...`);
+        }
     }
-    const data = await response.json();
-    let quiz = parseRobustJSON(data.choices[0].message.content);
-    quiz.exam = currentExam;
-    quiz.category = currentCategory;
-    return quiz;
+
+    throw lastError || new Error('OpenRouter free models failed');
 }
 
 function displayQuiz(quiz) {
