@@ -78,6 +78,19 @@ header {
     font-weight: 600;
     margin-left: 0.2rem;
     vertical-align: middle;
+    transition: all 0.2s ease;
+    user-select: none;
+}
+
+.version-badge.clickable-badge {
+    cursor: pointer;
+    box-shadow: 0 0 8px rgba(99, 102, 241, 0.4);
+}
+
+.version-badge.clickable-badge:hover {
+    background: linear-gradient(135deg, #a855f7, #6366f1);
+    transform: translateY(-1px) scale(1.05);
+    box-shadow: 0 0 14px rgba(168, 85, 247, 0.6);
 }
 
 .icon-btn {
@@ -825,5 +838,328 @@ select:focus, input:focus {
         width: 100%;
         flex: none !important;
     }
+}
+
+/* ==========================================================================
+   v1.11 Extensions: Markdown Table, Input Question, Changelog & Journal Cards
+   ========================================================================== */
+
+/* --- Markdown Question Styles (Tables, Pre/Code, Lists) --- */
+.question-markdown {
+    font-size: 1.15rem;
+    line-height: 1.7;
+    margin-bottom: 1.5rem;
+}
+
+.question-markdown table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 1.2rem 0;
+    font-size: 0.95rem;
+    background: rgba(15, 23, 42, 0.5);
+    border-radius: 8px;
+    overflow: hidden;
+    border: 1px solid var(--card-border);
+}
+
+.question-markdown th,
+.question-markdown td {
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    padding: 0.65rem 1rem;
+    text-align: left;
+}
+
+.question-markdown th {
+    background: rgba(99, 102, 241, 0.2);
+    color: #e2e8f0;
+    font-weight: 600;
+}
+
+.question-markdown tr:nth-child(even) {
+    background: rgba(255, 255, 255, 0.02);
+}
+
+.question-markdown pre {
+    background: rgba(0, 0, 0, 0.4);
+    padding: 0.9rem 1.1rem;
+    border-radius: 8px;
+    overflow-x: auto;
+    border: 1px solid var(--card-border);
+    font-family: 'Consolas', 'Courier New', monospace;
+    font-size: 0.92rem;
+    margin: 1rem 0;
+    line-height: 1.5;
+    color: #38bdf8;
+}
+
+.question-markdown code {
+    font-family: 'Consolas', monospace;
+    background: rgba(255, 255, 255, 0.1);
+    padding: 0.15rem 0.4rem;
+    border-radius: 4px;
+    font-size: 0.9em;
+}
+
+/* --- Input Answer Container (記述式解答) --- */
+.input-answer-container {
+    margin-top: 1.5rem;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--card-border);
+    border-radius: 12px;
+    padding: 1.4rem;
+}
+
+.input-field-wrapper {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+}
+
+#inputPromptLabel {
+    font-size: 0.95rem;
+    color: var(--text-secondary);
+    font-weight: 500;
+}
+
+.input-with-unit {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    position: relative;
+}
+
+#answerInput {
+    flex: 1;
+    background: rgba(15, 23, 42, 0.8);
+    border: 1px solid var(--card-border);
+    border-radius: 8px;
+    padding: 0.85rem 1.1rem;
+    font-size: 1.1rem;
+    color: var(--text-primary);
+    font-family: inherit;
+    outline: none;
+    transition: all 0.2s ease;
+}
+
+#answerInput:focus {
+    border-color: var(--primary-color);
+    box-shadow: 0 0 12px rgba(99, 102, 241, 0.4);
+    background: rgba(15, 23, 42, 0.95);
+}
+
+.unit-badge {
+    background: rgba(99, 102, 241, 0.15);
+    border: 1px solid rgba(99, 102, 241, 0.3);
+    color: #c7d2fe;
+    padding: 0.8rem 1rem;
+    border-radius: 8px;
+    font-size: 1rem;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+/* --- Input Result Feedback & Self-Grade Override --- */
+.input-result-feedback {
+    background: rgba(0, 0, 0, 0.25);
+    border: 1px solid var(--card-border);
+    border-radius: 10px;
+    padding: 1.1rem;
+    margin-bottom: 1.2rem;
+}
+
+.answer-compare-box {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+}
+
+.user-answer-row, .correct-answer-row {
+    display: flex;
+    align-items: baseline;
+    gap: 0.8rem;
+    font-size: 1.05rem;
+}
+
+.compare-label {
+    min-width: 100px;
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+}
+
+.compare-value {
+    font-weight: 700;
+    letter-spacing: 0.5px;
+}
+
+.user-answer-row .compare-value {
+    color: #94a3b8;
+}
+
+.result-correct .user-answer-row .compare-value {
+    color: var(--success-color);
+}
+
+.result-incorrect .user-answer-row .compare-value {
+    color: var(--error-color);
+    text-decoration: line-through;
+}
+
+.correct-answer-row .compare-value {
+    color: var(--success-color);
+}
+
+.override-btn {
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px dashed rgba(255, 255, 255, 0.3);
+    color: #e2e8f0;
+    padding: 0.45rem 0.9rem;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.override-btn:hover {
+    background: rgba(16, 185, 129, 0.2);
+    border-color: var(--success-color);
+    color: #6ee7b7;
+}
+
+.override-btn.already-applied {
+    opacity: 0.6;
+    pointer-events: none;
+    border-style: solid;
+    border-color: var(--success-color);
+    color: #6ee7b7;
+}
+
+/* --- Journal Entry Cards (仕訳選択肢のカード化) --- */
+.option-btn.journal-card {
+    text-align: left;
+    display: block;
+    line-height: 1.6;
+    padding: 0.85rem 1.1rem;
+}
+
+.journal-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    border-bottom: 1px dashed rgba(255, 255, 255, 0.1);
+    padding-bottom: 0.3rem;
+    margin-bottom: 0.3rem;
+}
+
+.journal-row:last-child {
+    border-bottom: none;
+    margin-bottom: 0;
+    padding-bottom: 0;
+}
+
+.journal-debit {
+    color: #93c5fd;
+    font-family: monospace;
+    font-size: 0.98rem;
+}
+
+.journal-credit {
+    color: #fca5a5;
+    font-family: monospace;
+    font-size: 0.98rem;
+    text-align: right;
+}
+
+/* --- Changelog Modal Styles --- */
+.changelog-modal-content {
+    max-height: 85vh;
+    display: flex;
+    flex-direction: column;
+}
+
+.changelog-timeline-wrapper {
+    overflow-y: auto;
+    max-height: 60vh;
+    padding-right: 0.5rem;
+}
+
+.changelog-timeline {
+    position: relative;
+    padding-left: 1.5rem;
+    border-left: 2px solid rgba(99, 102, 241, 0.3);
+    display: flex;
+    flex-direction: column;
+    gap: 1.8rem;
+    margin-left: 0.5rem;
+}
+
+.changelog-item {
+    position: relative;
+}
+
+.changelog-item::before {
+    content: '';
+    position: absolute;
+    left: -1.95rem;
+    top: 0.3rem;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: var(--primary-color);
+    border: 3px solid var(--bg-color);
+    box-shadow: 0 0 8px rgba(99, 102, 241, 0.8);
+}
+
+.changelog-item.latest::before {
+    background: #ec4899;
+    box-shadow: 0 0 10px rgba(236, 72, 153, 0.9);
+}
+
+.changelog-item-header {
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+    margin-bottom: 0.4rem;
+}
+
+.changelog-ver {
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: #f1f5f9;
+}
+
+.changelog-tag {
+    font-size: 0.75rem;
+    padding: 0.15rem 0.5rem;
+    border-radius: 10px;
+    background: rgba(99, 102, 241, 0.25);
+    color: #a5b4fc;
+    font-weight: 600;
+}
+
+.changelog-tag.latest-tag {
+    background: rgba(236, 72, 153, 0.25);
+    color: #f472b6;
+}
+
+.changelog-date {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    margin-left: auto;
+}
+
+.changelog-desc {
+    color: var(--text-primary);
+    font-size: 0.92rem;
+    line-height: 1.6;
+}
+
+.changelog-desc ul {
+    margin-left: 1.2rem;
+    margin-top: 0.3rem;
+}
+
+.changelog-desc li {
+    margin-bottom: 0.25rem;
+    color: #cbd5e1;
 }
 

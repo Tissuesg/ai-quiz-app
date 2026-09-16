@@ -2,6 +2,7 @@
 const EXAM_DATA = {
     sme: {
         name: "中小企業診断士",
+        formatType: "choice_primary", // 1次は4択が原則、財務会計等の計算特訓で記述可
         categories: [
             "企業経営理論",
             "財務・会計",
@@ -14,6 +15,7 @@ const EXAM_DATA = {
     },
     fp1: {
         name: "FP1級 (学科)",
+        formatType: "hybrid", // 基礎編(4択) & 応用編(計算記述・数値記入)
         categories: [
             "ライフプランニングと資金計画",
             "リスク管理",
@@ -25,6 +27,7 @@ const EXAM_DATA = {
     },
     tax: {
         name: "税理士",
+        formatType: "hybrid", // 簿記論・財務諸表論・税法(計算・記述・論述中心)
         categories: [
             "簿記論",
             "財務諸表論",
@@ -34,8 +37,33 @@ const EXAM_DATA = {
             "消費税法"
         ]
     },
+    boki2: {
+        name: "日商簿記2級",
+        formatType: "hybrid", // 仕訳・計算数値入力 & 選択
+        categories: [
+            "商業簿記 - 勘定科目・仕訳総合",
+            "商業簿記 - 決算整理・財務諸表",
+            "商業簿記 - 連結会計・本支店会計",
+            "工業簿記 - 費目別計算・個別原価計算",
+            "工業簿記 - 総合原価計算 (仕損・減損)",
+            "工業簿記 - 標準原価計算・直接原価計算(CVP)"
+        ]
+    },
+    boki1: {
+        name: "日商簿記1級",
+        formatType: "hybrid", // 仕訳・計算数値入力 & 選択
+        categories: [
+            "商業簿記 - 企業結合・事業分離・連結会計",
+            "商業簿記 - リース・金融商品・税効果・退職給付",
+            "会計学 - 会計基準・概念フレームワーク・純資産",
+            "工業簿記 - 標準原価計算・差異分析の深掘り",
+            "原価計算 - 業務的意思決定・設備投資意思決定",
+            "原価計算 - 活動基準原価計算(ABC)・戦略的原価計算"
+        ]
+    },
     itpass: {
         name: "ITパスポート",
+        formatType: "choice_only", // 完全4択CBT試験 (本試験に記述なし)
         categories: [
             "ストラテジ系",
             "マネジメント系",
@@ -44,6 +72,7 @@ const EXAM_DATA = {
     },
     takken: {
         name: "宅地建物取引士",
+        formatType: "choice_only", // 完全4択マークシート試験 (本試験に記述なし)
         categories: [
             "権利関係",
             "宅建業法",
@@ -52,6 +81,85 @@ const EXAM_DATA = {
         ]
     }
 };
+
+// Changelog Data (v1.00 - v1.11)
+const CHANGELOG_DATA = [
+    {
+        version: "v1.11",
+        date: "2026/09/16",
+        tag: "最新",
+        latest: true,
+        items: [
+            "日商簿記2級・日商簿記1級の追加（商業簿記・工業簿記・原価計算・会計学を完全網羅）",
+            "問題文のマークダウン表組みレンダリング対応（残高試算表や資料データが崩れず綺麗に表示）",
+            "記述・数値入力問題（仕訳・金額・用語をキーボードで直接解答、表記ゆれ許容採点＆自己採点救済ボタン搭載）",
+            "仕訳問題用カードレイアウトの適用（借方・貸方が整理された見やすい選択肢表示）",
+            "更新履歴（Changelog）モーダルの追加（バージョンバッジをクリックでいつでも閲覧可能）"
+        ]
+    },
+    {
+        version: "v1.10",
+        date: "2026/07/28",
+        tag: "機能追加",
+        latest: false,
+        items: [
+            "マルチLLMプロバイダー対応（Groq Llama 3.3 70B, OpenRouter無料モデル, OpenAI GPT-4o-mini）",
+            "AIエンジンごとのプロンプト最適化とエラー自動リカバリ"
+        ]
+    },
+    {
+        version: "v1.09",
+        date: "2026/07/21",
+        tag: "資格追加",
+        latest: false,
+        items: [
+            "宅地建物取引士（宅建）を追加（権利関係、宅建業法、法令上の制限、税・その他）"
+        ]
+    },
+    {
+        version: "v1.08",
+        date: "2026/07/21",
+        tag: "資格追加",
+        latest: false,
+        items: [
+            "ITパスポートを追加（ストラテジ系、マネジメント系、テクノロジ系）"
+        ]
+    },
+    {
+        version: "v1.07",
+        date: "2026/07/21",
+        tag: "機能改善",
+        latest: false,
+        items: [
+            "音声読み上げ（TTS）速度調整スライダー（0.5x〜2.0x）の追加",
+            "成績ダッシュボードの2カラム化およびレスポンシブ最適化"
+        ]
+    },
+    {
+        version: "v1.06",
+        date: "2026/07/21",
+        tag: "資格・機能追加",
+        latest: false,
+        items: [
+            "税理士（簿記論、財務諸表論、所得税法、法人税法、相続税法、消費税法）を追加",
+            "Web Speech APIによる解説の音声読み上げ機能（TTS）",
+            "解説・問題のPDF保存 / 印刷機能",
+            "学習時間トラッキング＆直近7日間の学習状況チャート"
+        ]
+    },
+    {
+        version: "v1.00",
+        date: "2026/07/20",
+        tag: "初期リリース",
+        latest: false,
+        items: [
+            "QuaGenius 正式リリース",
+            "中小企業診断士・FP1級対応",
+            "Google Gemini 2.5 Flash 連携によるリアルタイム過去問レベル問題生成",
+            "復習ストックモード・成績ダッシュボード"
+        ]
+    }
+];
 
 // State
 let currentQuiz = null;
@@ -74,6 +182,11 @@ const settingsBtn = document.getElementById('settingsBtn');
 const statsBtn = document.getElementById('statsBtn');
 const apiModal = document.getElementById('apiModal');
 const statsModal = document.getElementById('statsModal');
+const versionBadge = document.getElementById('versionBadge');
+const changelogModal = document.getElementById('changelogModal');
+const closeChangelogBtn = document.getElementById('closeChangelogBtn');
+const closeChangelogFooterBtn = document.getElementById('closeChangelogFooterBtn');
+const changelogList = document.getElementById('changelogList');
 
 const engineRadios = document.getElementsByName('aiEngine');
 const geminiKeyGroup = document.getElementById('geminiKeyGroup');
@@ -89,6 +202,7 @@ const toast = document.getElementById('toast');
 
 const examSelect = document.getElementById('examSelect');
 const categorySelect = document.getElementById('categorySelect');
+const formatSelect = document.getElementById('formatSelect');
 const calcOptionCheckbox = document.getElementById('calcOptionCheckbox');
 
 const generateBtn = document.getElementById('generateBtn');
@@ -106,10 +220,23 @@ const engineBadge = document.getElementById('engineBadge');
 const questionText = document.getElementById('questionText');
 const optionsContainer = document.getElementById('optionsContainer');
 
+// Input Question Elements
+const inputAnswerContainer = document.getElementById('inputAnswerContainer');
+const inputPromptLabel = document.getElementById('inputPromptLabel');
+const answerInput = document.getElementById('answerInput');
+const inputUnitBadge = document.getElementById('inputUnitBadge');
+const submitAnswerBtn = document.getElementById('submitAnswerBtn');
+
+// Result Elements
 const resultSection = document.getElementById('resultSection');
 const resultIcon = document.getElementById('resultIcon');
 const resultTitle = document.getElementById('resultTitle');
 const explanationText = document.getElementById('explanationText');
+const inputResultFeedback = document.getElementById('inputResultFeedback');
+const userAnswerDisplay = document.getElementById('userAnswerDisplay');
+const correctAnswerDisplay = document.getElementById('correctAnswerDisplay');
+const overrideCorrectBtn = document.getElementById('overrideCorrectBtn');
+
 const nextBtn = document.getElementById('nextBtn');
 const nextBtnText = nextBtn.querySelector('.btn-text');
 const nextBtnSpinner = nextBtn.querySelector('.spinner');
@@ -156,6 +283,38 @@ function init() {
 
     document.getElementById('closeStatsBtn').addEventListener('click', () => statsModal.classList.add('hidden'));
     
+    // Changelog Modal Listeners
+    if (versionBadge) {
+        versionBadge.addEventListener('click', () => {
+            renderChangelog();
+            changelogModal.classList.remove('hidden');
+        });
+    }
+    if (closeChangelogBtn) {
+        closeChangelogBtn.addEventListener('click', () => changelogModal.classList.add('hidden'));
+    }
+    if (closeChangelogFooterBtn) {
+        closeChangelogFooterBtn.addEventListener('click', () => changelogModal.classList.add('hidden'));
+    }
+    if (changelogModal) {
+        changelogModal.addEventListener('click', (e) => {
+            if (e.target === changelogModal) changelogModal.classList.add('hidden');
+        });
+    }
+
+    // 記述解答・自己採点救済リスナー
+    if (submitAnswerBtn) {
+        submitAnswerBtn.addEventListener('click', handleInputAnswer);
+    }
+    if (answerInput) {
+        answerInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') handleInputAnswer();
+        });
+    }
+    if (overrideCorrectBtn) {
+        overrideCorrectBtn.addEventListener('click', handleSelfGradeOverride);
+    }
+
     document.getElementById('resetStatsBtn').addEventListener('click', () => {
         if(confirm('今までの統計データと「間違えた問題ストック」をすべてリセットしますか？')) {
             stats = { total: 0, correct: 0, categories: {} };
@@ -176,6 +335,11 @@ function init() {
     categorySelect.addEventListener('change', () => {
         nextQuizPromise = null;
     });
+    if (formatSelect) {
+        formatSelect.addEventListener('change', () => {
+            nextQuizPromise = null;
+        });
+    }
     calcOptionCheckbox.addEventListener('change', () => {
         nextQuizPromise = null;
     });
@@ -192,11 +356,15 @@ function init() {
             const data = await fetchQuizData();
             displayQuiz(data);
         } catch (e) {
-            console.error(e);
+            console.error('[QuaGenius Error]', e);
             if (e.message === 'RATE_LIMIT') {
                 showToast('APIの制限(短時間にリクエストしすぎ)にかかりました。数秒待ってお試しください。');
+            } else if (e.message && e.message.startsWith('OPENROUTER_PARSE_FAIL:')) {
+                const detail = e.message.replace('OPENROUTER_PARSE_FAIL:', '').trim();
+                showToast(`OpenRouter: JSON解析失敗。ブラウザのコンソール(F12)で詳細を確認してください。`);
+                console.error('[OpenRouter Raw Response]', detail);
             } else {
-                showToast('AIが不正なデータを返したため、生成に失敗しました。再度お試しください。');
+                showToast(`生成エラー: ${e.message || '不明なエラー'}`);
             }
         } finally {
             setLoading(false);
@@ -355,6 +523,34 @@ function saveApiSettings() {
     showToast('設定を保存しました');
 }
 
+function updateFormatSelectUI() {
+    if (!formatSelect) return;
+    const examConfig = EXAM_DATA[examSelect.value];
+    const isChoiceOnly = examConfig && examConfig.formatType === 'choice_only';
+
+    const autoOpt = formatSelect.querySelector('option[value="auto"]');
+    const choiceOpt = formatSelect.querySelector('option[value="choice"]');
+    const inputOpt = formatSelect.querySelector('option[value="input"]');
+
+    if (isChoiceOnly) {
+        if (autoOpt) autoOpt.textContent = '🎲 おまかせ (本試験4択形式)';
+        if (choiceOpt) choiceOpt.textContent = '🔘 4択問題 (本試験形式)';
+        if (inputOpt) inputOpt.textContent = '✍️ 記述・用語入力 (暗記特訓ドリル)';
+    } else if (examSelect.value === 'fp1') {
+        if (autoOpt) autoOpt.textContent = '🎲 おまかせ (4択 / 応用編記述)';
+        if (choiceOpt) choiceOpt.textContent = '🔘 4択問題 (基礎編)';
+        if (inputOpt) inputOpt.textContent = '✍️ 記述・数値入力 (応用編計算)';
+    } else if (examSelect.value === 'boki2' || examSelect.value === 'boki1' || examSelect.value === 'tax') {
+        if (autoOpt) autoOpt.textContent = '🎲 おまかせ (4択 / 記述・仕訳)';
+        if (choiceOpt) choiceOpt.textContent = '🔘 4択問題 (仕訳カード形式)';
+        if (inputOpt) inputOpt.textContent = '✍️ 記述・数値入力 (仕訳・金額)';
+    } else {
+        if (autoOpt) autoOpt.textContent = '🎲 おまかせ (4択 / 記述)';
+        if (choiceOpt) choiceOpt.textContent = '🔘 4択問題';
+        if (inputOpt) inputOpt.textContent = '✍️ 記述・数値入力問題';
+    }
+}
+
 function updateCategories() {
     currentExam = examSelect.value;
     const categories = EXAM_DATA[currentExam].categories;
@@ -366,6 +562,9 @@ function updateCategories() {
         option.textContent = cat;
         categorySelect.appendChild(option);
     });
+
+    // 資格ごとの出題形式表示の更新
+    updateFormatSelectUI();
 }
 
 function showToast(message) {
@@ -410,7 +609,9 @@ async function fetchQuizData() {
     currentExam = examSelect.value;
     currentCategory = categorySelect.value;
     const isCalcMode = calcOptionCheckbox.checked;
+    const selectedFormat = formatSelect ? formatSelect.value : 'auto';
     const examName = EXAM_DATA[currentExam].name;
+    const isBookkeeping = currentExam === 'boki2' || currentExam === 'boki1' || currentExam === 'tax';
 
     const badgeNames = {
         gemini: 'Gemini 2.5',
@@ -420,39 +621,79 @@ async function fetchQuizData() {
     };
     engineBadge.textContent = badgeNames[engine] || 'Gemini 2.5';
 
+    const examConfig = EXAM_DATA[currentExam];
+    const isChoiceOnly = examConfig && examConfig.formatType === 'choice_only';
+
+    let formatInstruction = '';
+    if (selectedFormat === 'choice') {
+        formatInstruction = `・出題形式は必ず【4択問題（type: "choice"）】としてください。選択肢は4つ、正解は1つです。`;
+    } else if (selectedFormat === 'input') {
+        if (isChoiceOnly) {
+            formatInstruction = `・出題形式は【記述・重要用語(数値)入力問題（type: "input"）】としてください。（※重要指示：この試験の本試験は4択マークシートですが、本問は受験生の暗記定着度を高めるための「重要用語・重要数値の穴埋め・短答特訓ドリル」として特別に作成してください）。正解の語句や具体的な数値を直接キーボードで入力させる問題にしてください。`;
+        } else {
+            formatInstruction = `・出題形式は必ず【記述・数値入力問題（type: "input"）】としてください。解答者に具体的な金額・計算数値、または特定の勘定科目・専門用語を直接入力させる問題にしてください。`;
+        }
+    } else {
+        // auto (おまかせ)
+        if (isChoiceOnly) {
+            // 宅建・ITパスポートなど「専ら4択」の試験に対する厳格な出題ガード
+            formatInstruction = `・重要厳守：この資格試験（${examName}）の本試験は【完全マークシート4択試験】です。本試験に記述式問題は一切存在しないため、出題形式は必ず【4択問題（type: "choice"）】として作成してください。絶対に記述式問題を出題してはいけません。`;
+        } else if (currentExam === 'sme' && !isCalcMode) {
+            // 中小企業診断士1次試験（計算モードOFF時）
+            formatInstruction = `・この資格試験の1次試験はマークシート方式が基本であるため、原則として【4択問題（type: "choice"）】として作成してください。`;
+        } else {
+            // 簿記、税理士、FP1級（応用編含む）、診断士（計算モードON時）
+            formatInstruction = `・出題形式は、この出題分野の本試験傾向（マークシートまたは記述・計算）に合わせて【4択問題（type: "choice"）】または【記述・数値入力問題（type: "input"）】のいずれかを適切に選択してください。${isBookkeeping ? '（特に仕訳や計算数値・決算整理では記述・数値入力を積極的に採用してください）' : ''}${currentExam === 'fp1' ? '（タックスや相続・不動産等の具体的税額・各種係数計算では応用編に準じた記述・数値入力を積極的に採用してください）' : ''}`;
+        }
+    }
+
+    let bookkeepingInstruction = '';
+    if (isBookkeeping) {
+        bookkeepingInstruction = `
+【簿記・会計科目の特別指示】
+- 取引資料、決算整理前残高試算表、原価資料などの資料データは、必ずマークダウンのテーブル形式（| 項目 | 金額 | 等）を用いて見やすく整形してください。
+- 工業簿記の総合原価計算・原価差異分析などのデータも、表形式または整然としたリストで記載してください。
+- 4択で仕訳を出題する場合、選択肢は「（借）現金 100,000 / （貸）売上 100,000」のように借方・貸方を明確に区切って記述してください。
+- 記述・数値入力問題の場合、正解の数値（例: "120,000"）に加え、カンマなしや単位付きのゆらぎを "acceptable_answers" 配列に複数記載してください。また単位（例: "円"）を "unit" に指定してください。`;
+    }
+
     let prompt = `あなたは「${examName}」の専門講師です。
-以下の要件に従って、「${currentCategory}」分野の本試験レベルの4択問題を1問作成してください。
+以下の要件に従って、「${currentCategory}」分野の本試験レベルの実践的な問題を1問作成してください。
 
-【厳守事項】
-1. 本試験の過去問傾向に沿った実践的で良質な問題であること。
-2. 選択肢は4つ（正解は1つ）。
-3. 解説(explanation)は、必ず以下の構成（マークダウン形式）で出力すること。
+【出題要件】
+${formatInstruction}
+${bookkeepingInstruction}
+${isCalcMode ? '・必ず「具体的な数値を用いた計算問題」または「表やデータを用いた分析問題」を出題してください。問題文の中に具体的な数値条件を含めてください。' : ''}
+・問題および解説は、最新の法令、会計基準および税制に完全に準拠した内容にしてください。
+・解説(explanation)は、必ず以下の構成（マークダウン形式）で出力すること。
    - 【出題の趣旨】
-     （※必ずここで改行し、この問題で問われている核心部分を解説）
-
-   - 【各選択肢の解説】
-     （※必ずここで改行）
-     **選択肢1**
-     （選択肢の原文または要約）
-     **判定：【適切】または【不適切】**
-     （※必ずここで改行し、「なぜそうなるのか」の理由を文字数を惜しまずに、深く詳細に解説すること。理由を一言で済ませるのは厳禁です）
-
+     （この問題で問われている核心部分を解説）
+   - 【詳細解説】（4択の場合は各選択肢の正誤判定と理由、記述式の場合は正解の導出ロジックや計算過程・仕訳手順を深く詳細に解説すること。文字数を惜しまずに解説してください）
    - 【ワンポイントアドバイス】
-     （実務や試験対策に役立つTips）
-4. ※重要：問題および解説は、最新の法令および税制（現在施行されている基準）に完全に準拠した内容にしてください。古い法令に基づいた出題は絶対に避けてください。
-5. 出力は必ず以下のJSON形式のみとすること（全体を\`\`\`json等で囲まないこと）。
+     （実務や本試験対策に役立つTips）
 
+【出力形式】
+出力は必ず以下のJSON形式のみとすること（全体を\`\`\`json等で囲まないこと）。
+
+■ 4択問題の場合 (type: "choice")
 {
-  "question": "問題文",
+  "type": "choice",
+  "question": "問題文（Markdown形式の表や資料を含めてよい）",
   "options": ["選択肢1", "選択肢2", "選択肢3", "選択肢4"],
   "correct_index": 0,
   "explanation": "詳細な解説をここに記述"
-}`;
+}
 
-    // 計算問題・表問題の強制オプション
-    if (isCalcMode) {
-        prompt += `\n\n【特別指示】\n必ず「具体的な数値を用いた計算問題」または「表やデータを用いた分析問題」を出題してください。問題文の中に具体的な数値条件を含めてください。`;
-    }
+■ 記述・数値入力問題の場合 (type: "input")
+{
+  "type": "input",
+  "question": "問題文（Markdown形式の表や資料を含めてよい）",
+  "answer": "120,000",
+  "acceptable_answers": ["120000", "120,000", "120000円", "120,000円"],
+  "unit": "円",
+  "input_label": "金額を入力してください (半角数字):",
+  "explanation": "詳細な解説をここに記述"
+}`;
 
     // 自動リトライ用のラッパー関数
     const fetchWithRetry = async (fetcher, retries = 2) => {
@@ -610,78 +851,193 @@ async function fetchOpenRouter(prompt, apiKey) {
         'meta-llama/llama-3.3-70b-instruct:free',
         'google/gemma-2-9b-it:free',
         'qwen/qwen-2.5-72b-instruct:free',
-        'deepseek/deepseek-r1:free'
     ];
 
     let lastError = null;
 
     for (const model of freeModels) {
+        console.log(`[OpenRouter] Trying model: ${model}`);
         try {
             const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${apiKey}`,
-                    'HTTP-Referer': window.location.origin || 'http://localhost',
+                    'HTTP-Referer': window.location.href || 'http://localhost',
                     'X-Title': 'QuaGenius'
                 },
                 body: JSON.stringify({
                     model: model,
                     messages: [
-                        { role: "system", "content": "You are a strict JSON output generator for educational quizzes. Output ONLY valid JSON." },
-                        { role: "user", "content": prompt }
+                        {
+                            role: "system",
+                            content: `You are an expert quiz generator for Japanese professional certification exams. You MUST output ONLY a single valid JSON object with no other text, no markdown, no preamble. The JSON must have exactly these keys: "question" (string), "options" (array of 4 strings), "correct_index" (integer 0-3), "explanation" (string).`
+                        },
+                        { role: "user", content: prompt }
                     ],
-                    temperature: 0.7
+                    temperature: 0.5
                 })
             });
 
+            console.log(`[OpenRouter] Response status: ${response.status} for model: ${model}`);
+
             if (!response.ok) {
+                const errBody = await response.text().catch(() => '(no body)');
+                console.warn(`[OpenRouter] model ${model} HTTP error ${response.status}: ${errBody}`);
                 if (response.status === 429) throw new Error('RATE_LIMIT');
-                console.warn(`OpenRouter model ${model} failed with status ${response.status}. Trying fallback...`);
+                lastError = new Error(`HTTP ${response.status}: ${errBody}`);
                 continue;
             }
 
             const data = await response.json();
-            if (!data.choices || !data.choices[0] || !data.choices[0].message || !data.choices[0].message.content) {
-                console.warn(`OpenRouter model ${model} returned empty payload. Trying fallback...`);
+            console.log(`[OpenRouter] Full API response for ${model}:`, JSON.stringify(data, null, 2));
+
+            // エラーオブジェクトが返ってきた場合
+            if (data.error) {
+                console.warn(`[OpenRouter] API error object:`, data.error);
+                lastError = new Error(`API Error: ${data.error.message || JSON.stringify(data.error)}`);
                 continue;
             }
 
-            let quiz = parseRobustJSON(data.choices[0].message.content);
-            quiz.exam = currentExam;
-            quiz.category = currentCategory;
-            return quiz;
+            if (!data.choices || !data.choices[0] || !data.choices[0].message) {
+                console.warn(`[OpenRouter] model ${model} returned unexpected structure:`, data);
+                lastError = new Error('Unexpected response structure');
+                continue;
+            }
+
+            const rawContent = data.choices[0].message.content;
+            console.log(`[OpenRouter] Raw content from ${model}:`, rawContent);
+
+            if (!rawContent || rawContent.trim() === '') {
+                console.warn(`[OpenRouter] model ${model} returned empty content`);
+                lastError = new Error('Empty content from model');
+                continue;
+            }
+
+            try {
+                let quiz = parseRobustJSON(rawContent);
+                // 必須フィールドの検証
+                if (!quiz.question || !Array.isArray(quiz.options) || quiz.options.length < 4 || quiz.correct_index === undefined || !quiz.explanation) {
+                    console.warn(`[OpenRouter] model ${model} returned JSON missing required fields:`, quiz);
+                    lastError = new Error(`Missing required quiz fields: ${JSON.stringify(quiz)}`);
+                    continue;
+                }
+                quiz.exam = currentExam;
+                quiz.category = currentCategory;
+                console.log(`[OpenRouter] SUCCESS with model: ${model}`);
+                return quiz;
+            } catch (parseErr) {
+                console.error(`[OpenRouter] JSON parse failed for ${model}. Raw content was:`, rawContent);
+                lastError = new Error(`OPENROUTER_PARSE_FAIL: model=${model}, raw=${rawContent.substring(0, 200)}`);
+                continue;
+            }
+
         } catch (e) {
             if (e.message === 'RATE_LIMIT') throw e;
             lastError = e;
-            console.warn(`OpenRouter model ${model} failed: ${e.message}. Trying next fallback model...`);
+            console.warn(`[OpenRouter] model ${model} threw exception: ${e.message}`);
         }
     }
 
-    throw lastError || new Error('OpenRouter free models failed');
+    throw lastError || new Error('OpenRouter: all free models failed');
+}
+
+// 選択肢の仕訳フォーマット整形
+function formatOptionText(option, index) {
+    if (!option) return '';
+    // 仕訳形式（借・貸）の検出
+    if ((option.includes('借') || option.includes('（借）') || option.includes('(借)')) &&
+        (option.includes('貸') || option.includes('（貸）') || option.includes('(貸)'))) {
+        
+        const parts = option.split(/[\/／]/);
+        if (parts.length === 2) {
+            const debit = parts[0].trim();
+            const credit = parts[1].trim();
+            return `
+                <div class="journal-row">
+                    <span class="journal-debit"><span style="font-weight:bold; color:var(--text-secondary); margin-right:6px;">${index + 1}.</span>${debit}</span>
+                    <span class="journal-credit">${credit}</span>
+                </div>
+            `;
+        }
+    }
+    return `<span style="font-weight:bold; margin-right:8px;">${index + 1}.</span> ${option}`;
+}
+
+// 解答の表記ゆれ正規化関数
+function normalizeAnswer(str) {
+    if (!str && str !== 0) return '';
+    return str.toString()
+        .trim()
+        .replace(/[０-９]/g, s => String.fromCharCode(s.charCodeAt(0) - 0xFEE0))
+        .replace(/[Ａ-Ｚａ-ｚ]/g, s => String.fromCharCode(s.charCodeAt(0) - 0xFEE0))
+        .replace(/[,，、\s]/g, '')
+        .replace(/[円¥￥]/g, '')
+        .toLowerCase();
 }
 
 function displayQuiz(quiz) {
     stopSpeaking(); // 新しい問題が表示されたら読み上げを停止
     currentQuiz = quiz;
-    questionText.textContent = quiz.question;
-    optionsContainer.innerHTML = '';
+
+    // 問題文をMarkdownとしてパースして表示（表組み・強調・改行を完全再現）
+    questionText.innerHTML = marked.parse(quiz.question || '');
+
+    // 前回のリザルト記述フィードバックを非表示化
+    if (inputResultFeedback) {
+        inputResultFeedback.classList.add('hidden');
+    }
 
     // バッジにカテゴリ情報も表示
     const examLabel = quiz.exam === 'sme' ? '診断士' : 
                       (quiz.exam === 'fp1' ? 'FP1' : 
                       (quiz.exam === 'tax' ? '税理士' : 
+                      (quiz.exam === 'boki2' ? '簿記2級' :
+                      (quiz.exam === 'boki1' ? '簿記1級' :
                       (quiz.exam === 'itpass' ? 'ITパス' : 
-                      (quiz.exam === 'takken' ? '宅建' : ''))));
+                      (quiz.exam === 'takken' ? '宅建' : ''))))));
     engineBadge.textContent = isReviewMode ? `復習: [${examLabel}] ${quiz.category}` : engineBadge.textContent;
 
-    quiz.options.forEach((option, index) => {
-        const btn = document.createElement('button');
-        btn.className = 'option-btn';
-        btn.innerHTML = `<span style="font-weight:bold; margin-right:8px;">${index + 1}.</span> ${option}`;
-        btn.addEventListener('click', () => handleAnswer(index, btn));
-        optionsContainer.appendChild(btn);
-    });
+    const isInputType = quiz.type === 'input' || (!quiz.options || quiz.options.length === 0);
+
+    if (isInputType) {
+        // 記述・数値入力問題
+        optionsContainer.classList.add('hidden');
+        inputAnswerContainer.classList.remove('hidden');
+
+        inputPromptLabel.textContent = quiz.input_label || '解答を入力してください:';
+        answerInput.value = '';
+        answerInput.disabled = false;
+        submitAnswerBtn.disabled = false;
+
+        if (quiz.unit) {
+            inputUnitBadge.textContent = quiz.unit;
+            inputUnitBadge.classList.remove('hidden');
+        } else {
+            inputUnitBadge.classList.add('hidden');
+        }
+
+        setTimeout(() => answerInput.focus(), 150);
+    } else {
+        // 4択問題
+        inputAnswerContainer.classList.add('hidden');
+        optionsContainer.classList.remove('hidden');
+        optionsContainer.innerHTML = '';
+
+        quiz.options.forEach((option, index) => {
+            const btn = document.createElement('button');
+            btn.className = 'option-btn';
+            
+            // 仕訳形式なら専用クラスを付与
+            if ((option.includes('借') || option.includes('（借）')) && (option.includes('貸') || option.includes('（貸）'))) {
+                btn.classList.add('journal-card');
+            }
+
+            btn.innerHTML = formatOptionText(option, index);
+            btn.addEventListener('click', () => handleAnswer(index, btn));
+            optionsContainer.appendChild(btn);
+        });
+    }
 
     quizSection.classList.remove('hidden');
 }
@@ -712,6 +1068,11 @@ function handleAnswer(selectedIndex, selectedBtn) {
     resultIcon.textContent = isCorrect ? '🎉' : '💡';
     resultTitle.textContent = isCorrect ? '正解！' : '不正解...';
     
+    // 4択時は記述フィードバックを非表示
+    if (inputResultFeedback) {
+        inputResultFeedback.classList.add('hidden');
+    }
+
     explanationText.innerHTML = marked.parse(currentQuiz.explanation);
     
     resultSection.classList.remove('hidden');
@@ -724,6 +1085,129 @@ function handleAnswer(selectedIndex, selectedBtn) {
             throw e;
         });
     }
+}
+
+// 記述問題の解答送信処理
+function handleInputAnswer() {
+    const userRaw = answerInput.value.trim();
+    if (!userRaw) {
+        showToast('解答を入力してください');
+        answerInput.focus();
+        return;
+    }
+
+    answerInput.disabled = true;
+    submitAnswerBtn.disabled = true;
+
+    const normalizedUser = normalizeAnswer(userRaw);
+    let acceptedList = Array.isArray(currentQuiz.acceptable_answers) ? [...currentQuiz.acceptable_answers] : [];
+    if (currentQuiz.answer && !acceptedList.includes(currentQuiz.answer)) {
+        acceptedList.push(currentQuiz.answer);
+    }
+    if (acceptedList.length === 0 && currentQuiz.answer) {
+        acceptedList = [currentQuiz.answer];
+    }
+
+    const isCorrect = acceptedList.some(ans => normalizeAnswer(ans) === normalizedUser);
+
+    // Update Stats & Mistakes Stock
+    updateStatsAndMistakes(isCorrect);
+
+    // Show Result
+    resultSection.className = `glass-card result-section ${isCorrect ? 'result-correct' : 'result-incorrect'}`;
+    resultIcon.textContent = isCorrect ? '🎉' : '💡';
+    resultTitle.textContent = isCorrect ? '正解！' : '不正解...';
+
+    // 記述比較エリアの表示
+    const unitStr = currentQuiz.unit ? ` ${currentQuiz.unit}` : '';
+    userAnswerDisplay.textContent = `${userRaw}${unitStr}`;
+    userAnswerDisplay.style.color = '';
+    userAnswerDisplay.style.textDecoration = '';
+
+    correctAnswerDisplay.textContent = `${currentQuiz.answer || acceptedList[0] || '正解'}${unitStr}`;
+    inputResultFeedback.classList.remove('hidden');
+
+    // 自己採点救済ボタンの制御
+    if (isCorrect) {
+        overrideCorrectBtn.classList.add('hidden');
+    } else {
+        overrideCorrectBtn.classList.remove('hidden');
+        overrideCorrectBtn.classList.remove('already-applied');
+        overrideCorrectBtn.disabled = false;
+        overrideCorrectBtn.textContent = '🔄 正解扱いにする（自己採点救済）';
+    }
+
+    explanationText.innerHTML = marked.parse(currentQuiz.explanation);
+    resultSection.classList.remove('hidden');
+    resultSection.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+    // 先読み生成の開始 (復習モード以外の場合)
+    if (!isReviewMode) {
+        nextQuizPromise = fetchQuizData().catch(e => {
+            console.error("Background fetch failed:", e);
+            throw e;
+        });
+    }
+}
+
+// 自己採点救済（正解への手動補正）
+function handleSelfGradeOverride() {
+    if (overrideCorrectBtn.classList.contains('already-applied')) return;
+
+    // 統計を正解(+1)に補正
+    stats.correct += 1;
+    const catKey = `${currentQuiz.exam}_${currentQuiz.category}`;
+    if (stats.categories[catKey]) {
+        stats.categories[catKey].correct += 1;
+    }
+    localStorage.setItem('quagenius_stats', JSON.stringify(stats));
+
+    // 復習ストックから直前に追加されたこの問題を削除
+    mistakes = mistakes.filter(m => m !== currentQuiz);
+    localStorage.setItem('quagenius_mistakes', JSON.stringify(mistakes));
+
+    // UIを正解表示へ変更
+    resultSection.className = 'glass-card result-section result-correct';
+    resultIcon.textContent = '🎉';
+    resultTitle.textContent = '正解！（自己採点を反映）';
+    userAnswerDisplay.style.color = 'var(--success-color)';
+    userAnswerDisplay.style.textDecoration = 'none';
+
+    overrideCorrectBtn.classList.add('already-applied');
+    overrideCorrectBtn.disabled = true;
+    overrideCorrectBtn.textContent = '✅ 正解に反映しました';
+
+    renderStats();
+    updateReviewBtnState();
+    showToast('正解として統計に反映しました');
+}
+
+// Changelogレンダリング関数
+function renderChangelog() {
+    if (!changelogList) return;
+    changelogList.innerHTML = '';
+    CHANGELOG_DATA.forEach((item) => {
+        const itemEl = document.createElement('div');
+        itemEl.className = `changelog-item ${item.latest ? 'latest' : ''}`;
+        
+        const ul = document.createElement('ul');
+        item.items.forEach(liText => {
+            const li = document.createElement('li');
+            li.textContent = liText;
+            ul.appendChild(li);
+        });
+
+        itemEl.innerHTML = `
+            <div class="changelog-item-header">
+                <span class="changelog-ver">${item.version}</span>
+                <span class="changelog-tag ${item.latest ? 'latest-tag' : ''}">${item.tag}</span>
+                <span class="changelog-date">${item.date}</span>
+            </div>
+            <div class="changelog-desc"></div>
+        `;
+        itemEl.querySelector('.changelog-desc').appendChild(ul);
+        changelogList.appendChild(itemEl);
+    });
 }
 
 function updateStatsAndMistakes(isCorrect) {
@@ -806,8 +1290,10 @@ function renderStats() {
         const examName = exam === 'sme' ? '診断士' : 
                          (exam === 'fp1' ? 'FP1' : 
                          (exam === 'tax' ? '税理士' : 
+                         (exam === 'boki2' ? '簿記2級' :
+                         (exam === 'boki1' ? '簿記1級' :
                          (exam === 'itpass' ? 'ITパス' : 
-                         (exam === 'takken' ? '宅建' : ''))));
+                         (exam === 'takken' ? '宅建' : ''))))));
         const acc = Math.round((data.correct / data.total) * 100);
         
         let color = 'var(--error-color)';

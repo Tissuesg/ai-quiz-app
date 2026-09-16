@@ -18,7 +18,7 @@
     <div id="app">
         <header>
             <div class="logo">
-                <span class="icon">✨</span> <span class="logo-text">QuaGenius</span> <span class="version-badge">v1.10</span>
+                <span class="icon">✨</span> <span class="logo-text">QuaGenius</span> <span class="version-badge clickable-badge" id="versionBadge" title="更新履歴 (Changelog) を見る">v1.11</span>
             </div>
             <div class="header-actions">
                 <button id="statsBtn" class="icon-btn" title="成績・統計">📊</button>
@@ -35,6 +35,8 @@
                             <option value="sme">中小企業診断士</option>
                             <option value="fp1">FP1級</option>
                             <option value="tax">税理士</option>
+                            <option value="boki2">日商簿記2級</option>
+                            <option value="boki1">日商簿記1級</option>
                             <option value="itpass">ITパスポート</option>
                             <option value="takken">宅地建物取引士</option>
                         </select>
@@ -46,6 +48,17 @@
                     <div class="custom-select">
                         <select id="categorySelect">
                             <!-- Dynamically populated -->
+                        </select>
+                    </div>
+                </div>
+
+                <div class="control-group">
+                    <label for="formatSelect">出題形式</label>
+                    <div class="custom-select">
+                        <select id="formatSelect">
+                            <option value="auto">🎲 おまかせ (4択 / 記述)</option>
+                            <option value="choice">🔘 4択問題</option>
+                            <option value="input">✍️ 記述・数値入力問題</option>
                         </select>
                     </div>
                 </div>
@@ -71,11 +84,27 @@
             <!-- Quiz Display Area -->
             <div id="quizSection" class="glass-card quiz-section hidden">
                 <div class="badge" id="engineBadge">Gemini 2.5</div>
-                <h2 id="questionText">問題文がここに表示されます。</h2>
+                <div id="questionText" class="markdown-body question-markdown">問題文がここに表示されます。</div>
                 
+                <!-- 4択選択肢コンテナ -->
                 <div id="optionsContainer" class="options-container">
                     <!-- Options populated by JS -->
                 </div>
+
+                <!-- 記述式解答入力コンテナ -->
+                <div id="inputAnswerContainer" class="input-answer-container hidden">
+                    <div class="input-field-wrapper">
+                        <label id="inputPromptLabel" for="answerInput">解答を入力してください:</label>
+                        <div class="input-with-unit">
+                            <input type="text" id="answerInput" placeholder="例: 120,000 または 勘定科目" autocomplete="off">
+                            <span id="inputUnitBadge" class="unit-badge hidden">円</span>
+                        </div>
+                    </div>
+                    <button id="submitAnswerBtn" class="primary-btn mt-3" style="width: 100%;">
+                        <span class="btn-text">解答を送信する</span>
+                    </button>
+                </div>
+
                 <div class="skip-container" style="margin-top: 1.5rem; text-align: right;">
                     <button id="skipBtn" class="secondary-btn" style="font-size: 0.9rem; padding: 0.5rem 1rem;">
                         <span class="btn-text">⏭ この問題をスキップ</span>
@@ -89,6 +118,25 @@
                 <div id="resultHeader" class="result-header">
                     <div id="resultIcon" class="result-icon"></div>
                     <h3 id="resultTitle">結果</h3>
+                </div>
+
+                <!-- 記述解答用フィードバック表示 -->
+                <div id="inputResultFeedback" class="input-result-feedback hidden">
+                    <div class="answer-compare-box">
+                        <div class="user-answer-row">
+                            <span class="compare-label">あなたの解答:</span>
+                            <span id="userAnswerDisplay" class="compare-value"></span>
+                        </div>
+                        <div class="correct-answer-row">
+                            <span class="compare-label">模範解答:</span>
+                            <span id="correctAnswerDisplay" class="compare-value"></span>
+                        </div>
+                    </div>
+                    <div class="self-grade-action mt-2 text-right">
+                        <button id="overrideCorrectBtn" class="override-btn" title="表記ゆれ等で不正解になった場合に正解扱いに変更します">
+                            🔄 正解扱いにする（自己採点救済）
+                        </button>
+                    </div>
                 </div>
                 
                 <div class="result-actions" style="display: flex; flex-wrap: wrap; gap: 0.8rem; margin-bottom: 1rem; align-items: center;">
@@ -227,6 +275,24 @@
             
             <div class="modal-actions mt-4 border-top pt-4">
                 <button id="resetStatsBtn" class="danger-btn">データをリセット</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Changelog Modal -->
+    <div id="changelogModal" class="modal hidden">
+        <div class="modal-content glass-card changelog-modal-content" style="max-width: 720px; width: 100%;">
+            <div class="modal-header">
+                <h2>📜 更新履歴 (Changelog)</h2>
+                <button id="closeChangelogBtn" class="icon-btn">✖</button>
+            </div>
+            <div class="changelog-timeline-wrapper mt-3">
+                <div class="changelog-timeline" id="changelogList">
+                    <!-- Populated dynamically by app.js -->
+                </div>
+            </div>
+            <div class="modal-actions mt-4 border-top pt-3">
+                <button id="closeChangelogFooterBtn" class="secondary-btn" style="width: 100%;">閉じる</button>
             </div>
         </div>
     </div>
