@@ -18,7 +18,7 @@
     <div id="app">
         <header>
             <div class="logo">
-                <span class="icon">✨</span> <span class="logo-text">QuaGenius</span> <span class="version-badge clickable-badge" id="versionBadge" title="更新履歴 (Changelog) を見る">v1.11</span>
+                <span class="icon">✨</span> <span class="logo-text">QuaGenius</span> <span class="version-badge clickable-badge" id="versionBadge" title="更新履歴 (Changelog) を見る">v1.12</span>
             </div>
             <div class="header-actions">
                 <button id="statsBtn" class="icon-btn" title="成績・統計">📊</button>
@@ -178,19 +178,19 @@
             <div class="engine-toggle" style="display: flex; flex-direction: column; gap: 0.6rem;">
                 <label class="radio-label">
                     <input type="radio" name="aiEngine" value="gemini" checked>
-                    <span>Gemini 2.5 Flash (推奨・無料枠あり)</span>
+                    <span>Gemini 2.5 Flash / Lite (推奨・無料枠あり・自動フォールバック)</span>
                 </label>
                 <label class="radio-label">
                     <input type="radio" name="aiEngine" value="groq">
-                    <span>Groq [Llama 3.3 70B] (爆速・無料枠あり)</span>
+                    <span>Groq [Llama 3.3 70B / Llama 4 Scout] (爆速・無料枠あり)</span>
                 </label>
                 <label class="radio-label">
                     <input type="radio" name="aiEngine" value="openrouter">
-                    <span>OpenRouter [Free Model] (無料枠あり)</span>
+                    <span>OpenRouter [Auto Free Router] (無料枠あり)</span>
                 </label>
                 <label class="radio-label">
                     <input type="radio" name="aiEngine" value="openai">
-                    <span>OpenAI GPT-4o-mini (有料API)</span>
+                    <span>OpenAI [GPT-4.1-mini / GPT-4o-mini] (有料API)</span>
                 </label>
             </div>
 

@@ -82,13 +82,25 @@ const EXAM_DATA = {
     }
 };
 
-// Changelog Data (v1.00 - v1.11)
+// Changelog Data (v1.00 - v1.12)
 const CHANGELOG_DATA = [
+    {
+        version: "v1.12",
+        date: "2026/11/01",
+        tag: "最新",
+        latest: true,
+        items: [
+            "全AIエンジンのマルチモデル自動フォールバック対応（Gemini 2.5 Flash / Lite / 2.0、Groq Llama 3.3 / Llama 4 Scout、OpenRouter Auto-Free Router、OpenAI GPT-4.1-mini / 4o-mini）",
+            "通信切断（スリープ復帰直後）・サーバー一時過負荷（503等）・JSON整形崩れに対する自動リトライ＆自己修復ロジックの強化",
+            "OpenRouter利用時に記述・数値入力問題（type: input）がエラーとして弾かれる不具合を修正",
+            "全AIエンジン共通のJSON構造バリデーションおよび原因別日本語エラーメッセージの精緻化"
+        ]
+    },
     {
         version: "v1.11",
         date: "2026/09/16",
-        tag: "最新",
-        latest: true,
+        tag: "大型アップデート",
+        latest: false,
         items: [
             "日商簿記2級・日商簿記1級の追加（商業簿記・工業簿記・原価計算・会計学を完全網羅）",
             "問題文のマークダウン表組みレンダリング対応（残高試算表や資料データが崩れず綺麗に表示）",
@@ -357,15 +369,7 @@ function init() {
             displayQuiz(data);
         } catch (e) {
             console.error('[QuaGenius Error]', e);
-            if (e.message === 'RATE_LIMIT') {
-                showToast('APIの制限(短時間にリクエストしすぎ)にかかりました。数秒待ってお試しください。');
-            } else if (e.message && e.message.startsWith('OPENROUTER_PARSE_FAIL:')) {
-                const detail = e.message.replace('OPENROUTER_PARSE_FAIL:', '').trim();
-                showToast(`OpenRouter: JSON解析失敗。ブラウザのコンソール(F12)で詳細を確認してください。`);
-                console.error('[OpenRouter Raw Response]', detail);
-            } else {
-                showToast(`生成エラー: ${e.message || '不明なエラー'}`);
-            }
+            showToast(formatUserErrorMessage(e));
         } finally {
             setLoading(false);
         }
@@ -398,7 +402,9 @@ function init() {
             return;
         }
 
-        if (!nextQuizPromise) return;
+        if (!nextQuizPromise) {
+            nextQuizPromise = fetchQuizData();
+        }
 
         setNextBtnLoading(true);
         try {
@@ -407,13 +413,12 @@ function init() {
             quizSection.classList.add('hidden');
             displayQuiz(data);
         } catch (e) {
-            console.error(e);
-            if (e.message === 'RATE_LIMIT') {
-                showToast('APIの制限にかかりました。数秒待ってからボタンを押してください。');
-            } else {
-                showToast('次の問題の生成に失敗しました。もう一度生成をお試しください。');
-            }
-            nextQuizPromise = fetchQuizData();
+            console.error('[QuaGenius Next Error]', e);
+            showToast(formatUserErrorMessage(e));
+            nextQuizPromise = fetchQuizData().catch(err => {
+                console.warn('Retry prefetch failed:', err);
+                throw err;
+            });
         } finally {
             setNextBtnLoading(false);
         }
@@ -435,8 +440,8 @@ function init() {
             const data = await fetchQuizData();
             displayQuiz(data);
         } catch (e) {
-            console.error(e);
-            showToast('問題の生成に失敗しました。再度お試しください。');
+            console.error('[QuaGenius Skip Error]', e);
+            showToast(formatUserErrorMessage(e));
         } finally {
             skipBtn.disabled = false;
             skipBtnText.classList.remove('hidden');
@@ -614,12 +619,12 @@ async function fetchQuizData() {
     const isBookkeeping = currentExam === 'boki2' || currentExam === 'boki1' || currentExam === 'tax';
 
     const badgeNames = {
-        gemini: 'Gemini 2.5',
-        groq: 'Groq (Llama 3.3)',
+        gemini: 'Gemini 2.5 Flash',
+        groq: 'Groq (Llama 3.3 / 4)',
         openrouter: 'OpenRouter (Free)',
-        openai: 'GPT-4o-mini'
+        openai: 'GPT-4.1 / 4o mini'
     };
-    engineBadge.textContent = badgeNames[engine] || 'Gemini 2.5';
+    engineBadge.textContent = badgeNames[engine] || 'Gemini 2.5 Flash';
 
     const examConfig = EXAM_DATA[currentExam];
     const isChoiceOnly = examConfig && examConfig.formatType === 'choice_only';
@@ -695,15 +700,23 @@ ${isCalcMode ? '・必ず「具体的な数値を用いた計算問題」また�
   "explanation": "詳細な解説をここに記述"
 }`;
 
-    // 自動リトライ用のラッパー関数
-    const fetchWithRetry = async (fetcher, retries = 2) => {
+    // 自動リトライ用のラッパー関数（429レート制限、503サーバー過負荷、スリープ復帰直後のネットワーク切断、JSONパース崩れに対応）
+    const fetchWithRetry = async (fetcher, retries = 2, attempt = 1) => {
         try {
             return await fetcher(prompt, apiKey);
         } catch (e) {
-            if (e.message === 'RATE_LIMIT' && retries > 0) {
-                console.warn('Rate limited. Retrying in 3 seconds...');
-                await new Promise(resolve => setTimeout(resolve, 3000));
-                return await fetchWithRetry(fetcher, retries - 1);
+            const msg = e && e.message ? e.message : '';
+            const isNetworkErr = e instanceof TypeError || msg.includes('Failed to fetch') || msg.includes('NetworkError') || msg === 'NETWORK_ERROR';
+            const isRetryable = msg === 'RATE_LIMIT' || msg === 'SERVER_OVERLOAD' || msg === 'INVALID_QUIZ_FORMAT' || isNetworkErr;
+
+            if (isRetryable && retries > 0) {
+                const waitMs = msg === 'RATE_LIMIT' ? 2500 * attempt : 1500 * attempt;
+                console.warn(`[QuaGenius Retry] Reason: ${msg || 'Network'}. Retrying in ${waitMs}ms... (${retries} retries left)`);
+                await new Promise(resolve => setTimeout(resolve, waitMs));
+                return await fetchWithRetry(fetcher, retries - 1, attempt + 1);
+            }
+            if (isNetworkErr) {
+                throw new Error('NETWORK_ERROR');
             }
             throw e;
         }
@@ -720,13 +733,72 @@ ${isCalcMode ? '・必ず「具体的な数値を用いた計算問題」また�
     }
 }
 
+// ユーザー向けの分かりやすい日本語エラーメッセージ変換関数
+function formatUserErrorMessage(e) {
+    const msg = (e && e.message) ? e.message : '';
+    if (msg === 'API Key missing') {
+        return 'APIキーが設定されていません。右上の⚙️ボタンから設定してください。';
+    }
+    if (msg === 'AUTH_ERROR' || msg.includes('401') || msg.includes('403') || msg.includes('API_KEY_INVALID')) {
+        return 'APIキーが無効または権限がありません。右上の⚙️設定からAPIキーをご確認ください。';
+    }
+    if (msg === 'RATE_LIMIT' || msg.includes('429')) {
+        return 'APIの利用制限（短時間のリクエスト上限）に達しました。数秒待ってから再度お試しください。';
+    }
+    if (msg === 'SERVER_OVERLOAD' || msg.includes('503') || msg.includes('502') || msg.includes('504')) {
+        return 'AIサーバーが一時的に混雑しています。数秒待ってから再度お試しいただくか、別のAIエンジンをお試しください。';
+    }
+    if (msg === 'NETWORK_ERROR' || msg.includes('Failed to fetch') || msg.includes('NetworkError')) {
+        return 'ネットワーク通信エラーが発生しました。スリープ復帰直後や通信環境をご確認のうえ再度お試しください。';
+    }
+    if (msg === 'INVALID_QUIZ_FORMAT' || msg.startsWith('OPENROUTER_PARSE_FAIL:') || msg.includes('JSON parsing failed')) {
+        return 'AIが不正な形式のデータを返しました。もう一度ボタンを押して再生成してください。';
+    }
+    return `生成エラー: ${msg || '不明なエラーが発生しました'}`;
+}
+
+// 4択・記述の両形式に対応した共通クイズ構造バリデーション＆正規化関数
+function validateAndNormalizeQuiz(quiz) {
+    if (!quiz || typeof quiz !== 'object') {
+        throw new Error('INVALID_QUIZ_FORMAT');
+    }
+    if (!quiz.question || typeof quiz.question !== 'string' || !quiz.explanation || typeof quiz.explanation !== 'string') {
+        throw new Error('INVALID_QUIZ_FORMAT');
+    }
+
+    const isInput = quiz.type === 'input' || (!Array.isArray(quiz.options) || quiz.options.length === 0);
+
+    if (isInput) {
+        if (quiz.answer === undefined || quiz.answer === null || String(quiz.answer).trim() === '') {
+            throw new Error('INVALID_QUIZ_FORMAT');
+        }
+        quiz.type = 'input';
+        quiz.answer = String(quiz.answer).trim();
+        if (!Array.isArray(quiz.acceptable_answers) || quiz.acceptable_answers.length === 0) {
+            quiz.acceptable_answers = [quiz.answer];
+        } else {
+            quiz.acceptable_answers = quiz.acceptable_answers.map(a => String(a).trim());
+        }
+    } else {
+        if (!Array.isArray(quiz.options) || quiz.options.length < 4) {
+            throw new Error('INVALID_QUIZ_FORMAT');
+        }
+        quiz.type = 'choice';
+        quiz.options = quiz.options.slice(0, 4).map(o => String(o));
+        const idx = Number(quiz.correct_index);
+        quiz.correct_index = (!Number.isNaN(idx) && idx >= 0 && idx < 4) ? idx : 0;
+    }
+
+    return quiz;
+}
+
 // AIが余計な文字（思考ログ<think>やマークダウン等）を含めても強制的にJSONを抽出・整形する関数
 function parseRobustJSON(text) {
     if (!text || typeof text !== 'string') {
-        throw new Error('Empty or non-string response');
+        throw new Error('INVALID_QUIZ_FORMAT');
     }
 
-    // 1. DeepSeek R1等の思考ブロック <think>...</think> を削除
+    // 1. DeepSeek R1 / Qwen QwQ等の思考ブロック <think>...</think> を削除
     let cleaned = text.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
 
     // 2. マークダウンコードブロック ```json ... ``` から中身を取り出す
@@ -758,98 +830,190 @@ function parseRobustJSON(text) {
             return JSON.parse(sanitized);
         } catch (e2) {
             console.error('Raw LLM response parsing failed:', text);
-            throw new Error('JSON parsing failed completely');
+            throw new Error('INVALID_QUIZ_FORMAT');
         }
     }
 }
 
 async function fetchGemini(prompt, apiKey) {
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            contents: [{ parts: [{ text: prompt }] }],
-            generationConfig: {
-                temperature: 0.7,
-                responseMimeType: "application/json",
-            }
-        })
-    });
+    // Gemini マルチモデル・フォールバック（特定モデルの混雑・新規キー制限・世代移行に自動対応）
+    const geminiModels = [
+        'gemini-2.5-flash',
+        'gemini-2.5-flash-lite',
+        'gemini-2.0-flash'
+    ];
 
-    if (!response.ok) {
-        if (response.status === 429) throw new Error('RATE_LIMIT');
-        throw new Error(`Gemini API Error: ${response.status}`);
+    let lastError = null;
+
+    for (const model of geminiModels) {
+        try {
+            const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    contents: [{ parts: [{ text: prompt }] }],
+                    generationConfig: {
+                        temperature: 0.7,
+                        responseMimeType: "application/json",
+                    }
+                })
+            });
+
+            if (!response.ok) {
+                const errText = await response.text().catch(() => '');
+                if (response.status === 400 && errText.includes('API_KEY_INVALID')) {
+                    throw new Error('AUTH_ERROR');
+                }
+                if (response.status === 401) {
+                    throw new Error('AUTH_ERROR');
+                }
+                // 404(モデル制限/廃止), 403(モデル単位のアクセス制限), 429(レート制限), 503(過負荷)は次のモデルへフォールバック
+                console.warn(`[Gemini] Model ${model} returned HTTP ${response.status}. Trying fallback...`);
+                if (response.status === 429) {
+                    lastError = new Error('RATE_LIMIT');
+                } else if (response.status >= 500) {
+                    lastError = new Error('SERVER_OVERLOAD');
+                } else {
+                    lastError = new Error(`Gemini API Error: ${response.status}`);
+                }
+                continue;
+            }
+
+            const data = await response.json();
+            const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+            let quiz = validateAndNormalizeQuiz(parseRobustJSON(rawText));
+            quiz.exam = currentExam;
+            quiz.category = currentCategory;
+            return quiz;
+        } catch (e) {
+            if (e.message === 'AUTH_ERROR') throw e;
+            lastError = e;
+            console.warn(`[Gemini] Model ${model} failed: ${e.message}`);
+        }
     }
-    const data = await response.json();
-    let quiz = parseRobustJSON(data.candidates[0].content.parts[0].text);
-    quiz.exam = currentExam;
-    quiz.category = currentCategory;
-    return quiz;
+
+    throw lastError || new Error('SERVER_OVERLOAD');
 }
 
 async function fetchOpenAI(prompt, apiKey) {
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${apiKey}`
-        },
-        body: JSON.stringify({
-            model: 'gpt-4o-mini',
-            response_format: { type: "json_object" },
-            messages: [
-                { role: "system", "content": "You are a strict JSON output generator for educational quizzes." },
-                { role: "user", "content": prompt }
-            ],
-            temperature: 0.7
-        })
-    });
+    // OpenAI マルチモデル・フォールバック（最新のgpt-4.1-miniとgpt-4o-miniを順次試行）
+    const openaiModels = [
+        'gpt-4.1-mini',
+        'gpt-4o-mini'
+    ];
 
-    if (!response.ok) {
-        if (response.status === 429) throw new Error('RATE_LIMIT');
-        throw new Error(`OpenAI API Error: ${response.status}`);
+    let lastError = null;
+
+    for (const model of openaiModels) {
+        try {
+            const response = await fetch('https://api.openai.com/v1/chat/completions', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${apiKey}`
+                },
+                body: JSON.stringify({
+                    model: model,
+                    response_format: { type: "json_object" },
+                    messages: [
+                        { role: "system", content: "You are a strict JSON output generator for Japanese professional certification quizzes." },
+                        { role: "user", content: prompt }
+                    ],
+                    temperature: 0.7
+                })
+            });
+
+            if (!response.ok) {
+                if (response.status === 401) throw new Error('AUTH_ERROR');
+                console.warn(`[OpenAI] Model ${model} returned HTTP ${response.status}. Trying fallback...`);
+                if (response.status === 429) {
+                    lastError = new Error('RATE_LIMIT');
+                } else if (response.status >= 500) {
+                    lastError = new Error('SERVER_OVERLOAD');
+                } else {
+                    lastError = new Error(`OpenAI API Error: ${response.status}`);
+                }
+                continue;
+            }
+
+            const data = await response.json();
+            let quiz = validateAndNormalizeQuiz(parseRobustJSON(data?.choices?.[0]?.message?.content));
+            quiz.exam = currentExam;
+            quiz.category = currentCategory;
+            return quiz;
+        } catch (e) {
+            if (e.message === 'AUTH_ERROR') throw e;
+            lastError = e;
+            console.warn(`[OpenAI] Model ${model} failed: ${e.message}`);
+        }
     }
-    const data = await response.json();
-    let quiz = parseRobustJSON(data.choices[0].message.content);
-    quiz.exam = currentExam;
-    quiz.category = currentCategory;
-    return quiz;
+
+    throw lastError || new Error('SERVER_OVERLOAD');
 }
 
 async function fetchGroq(prompt, apiKey) {
-    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${apiKey}`
-        },
-        body: JSON.stringify({
-            model: 'llama-3.3-70b-versatile',
-            response_format: { type: "json_object" },
-            messages: [
-                { role: "system", "content": "You are a strict JSON output generator for educational quizzes." },
-                { role: "user", "content": prompt }
-            ],
-            temperature: 0.7
-        })
-    });
+    // Groq マルチモデル・フォールバック（Llama 3.3 70B -> Llama 4 Scout -> Llama 3.1 8B）
+    const groqModels = [
+        'llama-3.3-70b-versatile',
+        'meta-llama/llama-4-scout-17b-16e-instruct',
+        'llama-3.1-8b-instant'
+    ];
 
-    if (!response.ok) {
-        if (response.status === 429) throw new Error('RATE_LIMIT');
-        throw new Error(`Groq API Error: ${response.status}`);
+    let lastError = null;
+
+    for (const model of groqModels) {
+        try {
+            const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${apiKey}`
+                },
+                body: JSON.stringify({
+                    model: model,
+                    response_format: { type: "json_object" },
+                    messages: [
+                        { role: "system", content: "You are a strict JSON output generator for Japanese professional certification quizzes." },
+                        { role: "user", content: prompt }
+                    ],
+                    temperature: 0.7
+                })
+            });
+
+            if (!response.ok) {
+                if (response.status === 401) throw new Error('AUTH_ERROR');
+                console.warn(`[Groq] Model ${model} returned HTTP ${response.status}. Trying fallback...`);
+                if (response.status === 429) {
+                    lastError = new Error('RATE_LIMIT');
+                } else if (response.status >= 500) {
+                    lastError = new Error('SERVER_OVERLOAD');
+                } else {
+                    lastError = new Error(`Groq API Error: ${response.status}`);
+                }
+                continue;
+            }
+
+            const data = await response.json();
+            let quiz = validateAndNormalizeQuiz(parseRobustJSON(data?.choices?.[0]?.message?.content));
+            quiz.exam = currentExam;
+            quiz.category = currentCategory;
+            return quiz;
+        } catch (e) {
+            if (e.message === 'AUTH_ERROR') throw e;
+            lastError = e;
+            console.warn(`[Groq] Model ${model} failed: ${e.message}`);
+        }
     }
-    const data = await response.json();
-    let quiz = parseRobustJSON(data.choices[0].message.content);
-    quiz.exam = currentExam;
-    quiz.category = currentCategory;
-    return quiz;
+
+    throw lastError || new Error('SERVER_OVERLOAD');
 }
 
 async function fetchOpenRouter(prompt, apiKey) {
-    // OpenRouterの無料モデルリスト（順次フォールバック）
+    // OpenRouterの無料モデルリスト（公式自動ルーター openrouter/free を最優先に順次フォールバック）
     const freeModels = [
+        'openrouter/free',
         'meta-llama/llama-3.3-70b-instruct:free',
-        'google/gemma-2-9b-it:free',
+        'deepseek/deepseek-chat:free',
         'qwen/qwen-2.5-72b-instruct:free',
     ];
 
@@ -871,7 +1035,7 @@ async function fetchOpenRouter(prompt, apiKey) {
                     messages: [
                         {
                             role: "system",
-                            content: `You are an expert quiz generator for Japanese professional certification exams. You MUST output ONLY a single valid JSON object with no other text, no markdown, no preamble. The JSON must have exactly these keys: "question" (string), "options" (array of 4 strings), "correct_index" (integer 0-3), "explanation" (string).`
+                            content: `You are an expert quiz generator for Japanese professional certification exams. You MUST output ONLY a single valid JSON object with no other text, no markdown, no preamble. Follow the exact JSON schema requested in the user prompt (either type: "choice" with 4 options, or type: "input" with answer and acceptable_answers).`
                         },
                         { role: "user", content: prompt }
                     ],
@@ -884,13 +1048,20 @@ async function fetchOpenRouter(prompt, apiKey) {
             if (!response.ok) {
                 const errBody = await response.text().catch(() => '(no body)');
                 console.warn(`[OpenRouter] model ${model} HTTP error ${response.status}: ${errBody}`);
-                if (response.status === 429) throw new Error('RATE_LIMIT');
+                if (response.status === 401) throw new Error('AUTH_ERROR');
+                if (response.status === 429) {
+                    lastError = new Error('RATE_LIMIT');
+                    continue;
+                }
+                if (response.status >= 500) {
+                    lastError = new Error('SERVER_OVERLOAD');
+                    continue;
+                }
                 lastError = new Error(`HTTP ${response.status}: ${errBody}`);
                 continue;
             }
 
             const data = await response.json();
-            console.log(`[OpenRouter] Full API response for ${model}:`, JSON.stringify(data, null, 2));
 
             // エラーオブジェクトが返ってきた場合
             if (data.error) {
@@ -899,47 +1070,33 @@ async function fetchOpenRouter(prompt, apiKey) {
                 continue;
             }
 
-            if (!data.choices || !data.choices[0] || !data.choices[0].message) {
-                console.warn(`[OpenRouter] model ${model} returned unexpected structure:`, data);
-                lastError = new Error('Unexpected response structure');
-                continue;
-            }
-
-            const rawContent = data.choices[0].message.content;
-            console.log(`[OpenRouter] Raw content from ${model}:`, rawContent);
-
+            const rawContent = data?.choices?.[0]?.message?.content;
             if (!rawContent || rawContent.trim() === '') {
                 console.warn(`[OpenRouter] model ${model} returned empty content`);
-                lastError = new Error('Empty content from model');
+                lastError = new Error('INVALID_QUIZ_FORMAT');
                 continue;
             }
 
             try {
-                let quiz = parseRobustJSON(rawContent);
-                // 必須フィールドの検証
-                if (!quiz.question || !Array.isArray(quiz.options) || quiz.options.length < 4 || quiz.correct_index === undefined || !quiz.explanation) {
-                    console.warn(`[OpenRouter] model ${model} returned JSON missing required fields:`, quiz);
-                    lastError = new Error(`Missing required quiz fields: ${JSON.stringify(quiz)}`);
-                    continue;
-                }
+                let quiz = validateAndNormalizeQuiz(parseRobustJSON(rawContent));
                 quiz.exam = currentExam;
                 quiz.category = currentCategory;
                 console.log(`[OpenRouter] SUCCESS with model: ${model}`);
                 return quiz;
             } catch (parseErr) {
-                console.error(`[OpenRouter] JSON parse failed for ${model}. Raw content was:`, rawContent);
+                console.error(`[OpenRouter] JSON validation failed for ${model}. Raw content was:`, rawContent);
                 lastError = new Error(`OPENROUTER_PARSE_FAIL: model=${model}, raw=${rawContent.substring(0, 200)}`);
                 continue;
             }
 
         } catch (e) {
-            if (e.message === 'RATE_LIMIT') throw e;
+            if (e.message === 'AUTH_ERROR') throw e;
             lastError = e;
             console.warn(`[OpenRouter] model ${model} threw exception: ${e.message}`);
         }
     }
 
-    throw lastError || new Error('OpenRouter: all free models failed');
+    throw lastError || new Error('SERVER_OVERLOAD');
 }
 
 // 選択肢の仕訳フォーマット整形
