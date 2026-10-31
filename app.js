@@ -82,13 +82,24 @@ const EXAM_DATA = {
     }
 };
 
-// Changelog Data (v1.00 - v1.12)
+// Changelog Data (v1.00 - v2.00)
 const CHANGELOG_DATA = [
+    {
+        version: "v2.00",
+        date: "2026/11/01",
+        tag: "メジャーアップデート",
+        latest: true,
+        items: [
+            "🎓 AI専門講師への深掘り質問（AI家庭教師チャット）機能を搭載（解説画面からワンタップ質問チップや自由入力で疑問点を対話形式で即座に解消）",
+            "🌐 Google検索グラウンディング連動モードを搭載（Gemini APIのWeb検索ツールにより最新の法改正・税制改正・会計基準・統計データを参照して作問・解説し、参照元リンクを表示）",
+            "📐 Structured Outputs（厳格JSONスキーマ指定 responseSchema）へ完全移行し、AI出力の構造エラーを排除"
+        ]
+    },
     {
         version: "v1.12",
         date: "2026/11/01",
-        tag: "最新",
-        latest: true,
+        tag: "安定性・AI更新",
+        latest: false,
         items: [
             "全AIエンジンのマルチモデル自動フォールバック対応（Gemini 2.5 Flash / Lite / 2.0、Groq Llama 3.3 / Llama 4 Scout、OpenRouter Auto-Free Router、OpenAI GPT-4.1-mini / 4o-mini）",
             "通信切断（スリープ復帰直後）・サーバー一時過負荷（503等）・JSON整形崩れに対する自動リトライ＆自己修復ロジックの強化",
@@ -185,9 +196,11 @@ if (!stats.dailyHistory) {
 let mistakes = JSON.parse(localStorage.getItem('quagenius_mistakes')) || [];
 let nextQuizPromise = null;
 
-// Learning Tracking & TTS State
+// Learning Tracking, TTS & AI Tutor State
 let sessionSeconds = 0;
 let isSpeaking = false;
+let currentTutorHistory = [];
+let isTutorLoading = false;
 
 // DOM Elements
 const settingsBtn = document.getElementById('settingsBtn');
@@ -216,6 +229,7 @@ const examSelect = document.getElementById('examSelect');
 const categorySelect = document.getElementById('categorySelect');
 const formatSelect = document.getElementById('formatSelect');
 const calcOptionCheckbox = document.getElementById('calcOptionCheckbox');
+const searchGroundingCheckbox = document.getElementById('searchGroundingCheckbox');
 
 const generateBtn = document.getElementById('generateBtn');
 const reviewBtn = document.getElementById('reviewBtn');
@@ -244,10 +258,19 @@ const resultSection = document.getElementById('resultSection');
 const resultIcon = document.getElementById('resultIcon');
 const resultTitle = document.getElementById('resultTitle');
 const explanationText = document.getElementById('explanationText');
+const groundingInfoBox = document.getElementById('groundingInfoBox');
+const groundingSourcesList = document.getElementById('groundingSourcesList');
 const inputResultFeedback = document.getElementById('inputResultFeedback');
 const userAnswerDisplay = document.getElementById('userAnswerDisplay');
 const correctAnswerDisplay = document.getElementById('correctAnswerDisplay');
 const overrideCorrectBtn = document.getElementById('overrideCorrectBtn');
+
+// AI Tutor Elements
+const aiTutorSection = document.getElementById('aiTutorSection');
+const tutorChatHistory = document.getElementById('tutorChatHistory');
+const tutorInput = document.getElementById('tutorInput');
+const tutorSendBtn = document.getElementById('tutorSendBtn');
+const tutorChipBtns = document.querySelectorAll('.tutor-chip-btn');
 
 const nextBtn = document.getElementById('nextBtn');
 const nextBtnText = nextBtn.querySelector('.btn-text');
@@ -327,6 +350,32 @@ function init() {
         overrideCorrectBtn.addEventListener('click', handleSelfGradeOverride);
     }
 
+    // AI家庭教師（深掘り質問）リスナー
+    if (tutorSendBtn) {
+        tutorSendBtn.addEventListener('click', () => {
+            if (tutorInput && tutorInput.value.trim()) {
+                handleTutorQuestion(tutorInput.value.trim());
+            }
+        });
+    }
+    if (tutorInput) {
+        tutorInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && tutorInput.value.trim()) {
+                handleTutorQuestion(tutorInput.value.trim());
+            }
+        });
+    }
+    if (tutorChipBtns && tutorChipBtns.length > 0) {
+        tutorChipBtns.forEach(chip => {
+            chip.addEventListener('click', () => {
+                const promptText = chip.getAttribute('data-prompt');
+                if (promptText) {
+                    handleTutorQuestion(promptText);
+                }
+            });
+        });
+    }
+
     document.getElementById('resetStatsBtn').addEventListener('click', () => {
         if(confirm('今までの統計データと「間違えた問題ストック」をすべてリセットしますか？')) {
             stats = { total: 0, correct: 0, categories: {} };
@@ -355,6 +404,11 @@ function init() {
     calcOptionCheckbox.addEventListener('change', () => {
         nextQuizPromise = null;
     });
+    if (searchGroundingCheckbox) {
+        searchGroundingCheckbox.addEventListener('change', () => {
+            nextQuizPromise = null;
+        });
+    }
     
     // 初回生成ボタン
     generateBtn.addEventListener('click', async () => {
@@ -614,12 +668,13 @@ async function fetchQuizData() {
     currentExam = examSelect.value;
     currentCategory = categorySelect.value;
     const isCalcMode = calcOptionCheckbox.checked;
+    const useSearchGrounding = (searchGroundingCheckbox && searchGroundingCheckbox.checked && engine === 'gemini');
     const selectedFormat = formatSelect ? formatSelect.value : 'auto';
     const examName = EXAM_DATA[currentExam].name;
     const isBookkeeping = currentExam === 'boki2' || currentExam === 'boki1' || currentExam === 'tax';
 
     const badgeNames = {
-        gemini: 'Gemini 2.5 Flash',
+        gemini: useSearchGrounding ? 'Gemini 2.5 (🌐Web検索連動)' : 'Gemini 2.5 Flash',
         groq: 'Groq (Llama 3.3 / 4)',
         openrouter: 'OpenRouter (Free)',
         openai: 'GPT-4.1 / 4o mini'
@@ -669,6 +724,7 @@ async function fetchQuizData() {
 ${formatInstruction}
 ${bookkeepingInstruction}
 ${isCalcMode ? '・必ず「具体的な数値を用いた計算問題」または「表やデータを用いた分析問題」を出題してください。問題文の中に具体的な数値条件を含めてください。' : ''}
+${useSearchGrounding ? '・【Google検索グラウンディング連動】必ずGoogle検索ツールを用いて、最新の法改正・税制改正・会計基準・公的統計データを確認し、現行の最新制度に基づいた問題および解説を作成してください。解説内で参照した最新の改正点や制度の根拠にも触れてください。' : ''}
 ・問題および解説は、最新の法令、会計基準および税制に完全に準拠した内容にしてください。
 ・解説(explanation)は、必ず以下の構成（マークダウン形式）で出力すること。
    - 【出題の趣旨】
@@ -703,7 +759,7 @@ ${isCalcMode ? '・必ず「具体的な数値を用いた計算問題」また�
     // 自動リトライ用のラッパー関数（429レート制限、503サーバー過負荷、スリープ復帰直後のネットワーク切断、JSONパース崩れに対応）
     const fetchWithRetry = async (fetcher, retries = 2, attempt = 1) => {
         try {
-            return await fetcher(prompt, apiKey);
+            return await fetcher(prompt, apiKey, { useSearchGrounding, selectedFormat, isChoiceOnly });
         } catch (e) {
             const msg = e && e.message ? e.message : '';
             const isNetworkErr = e instanceof TypeError || msg.includes('Failed to fetch') || msg.includes('NetworkError') || msg === 'NETWORK_ERROR';
@@ -835,7 +891,91 @@ function parseRobustJSON(text) {
     }
 }
 
-async function fetchGemini(prompt, apiKey) {
+// v2.00: Structured Outputs 用の厳格なJSONスキーマ生成関数
+function buildGeminiResponseSchema(selectedFormat, isChoiceOnly) {
+    const forceChoice = selectedFormat === 'choice' || (selectedFormat === 'auto' && isChoiceOnly);
+    const forceInput = selectedFormat === 'input';
+
+    if (forceChoice) {
+        return {
+            type: "OBJECT",
+            properties: {
+                type: { type: "STRING", enum: ["choice"] },
+                question: { type: "STRING", description: "問題文（Markdown形式の表や資料を含む）" },
+                options: {
+                    type: "ARRAY",
+                    items: { type: "STRING" },
+                    description: "4つの選択肢の配列"
+                },
+                correct_index: { type: "INTEGER", description: "正解の選択肢インデックス (0〜3)" },
+                explanation: { type: "STRING", description: "Markdown形式の詳細な解説" }
+            },
+            required: ["type", "question", "options", "correct_index", "explanation"]
+        };
+    }
+
+    if (forceInput) {
+        return {
+            type: "OBJECT",
+            properties: {
+                type: { type: "STRING", enum: ["input"] },
+                question: { type: "STRING", description: "問題文（Markdown形式の表や資料を含む）" },
+                answer: { type: "STRING", description: "模範解答（金額または用語）" },
+                acceptable_answers: {
+                    type: "ARRAY",
+                    items: { type: "STRING" },
+                    description: "表記ゆれを許容する正解リスト"
+                },
+                unit: { type: "STRING", description: "単位（円、%、人など。不要なら空文字）" },
+                input_label: { type: "STRING", description: "入力欄のラベル" },
+                explanation: { type: "STRING", description: "Markdown形式の詳細な解説" }
+            },
+            required: ["type", "question", "answer", "acceptable_answers", "explanation"]
+        };
+    }
+
+    // ハイブリッド（おまかせ）時
+    return {
+        type: "OBJECT",
+        properties: {
+            type: { type: "STRING", enum: ["choice", "input"] },
+            question: { type: "STRING" },
+            options: { type: "ARRAY", items: { type: "STRING" } },
+            correct_index: { type: "INTEGER" },
+            answer: { type: "STRING" },
+            acceptable_answers: { type: "ARRAY", items: { type: "STRING" } },
+            unit: { type: "STRING" },
+            input_label: { type: "STRING" },
+            explanation: { type: "STRING" }
+        },
+        required: ["type", "question", "explanation"]
+    };
+}
+
+// Gemini レスポンスから Google検索グラウンディングの参照情報を抽出する関数
+function extractGeminiGrounding(candidate) {
+    const meta = candidate?.groundingMetadata;
+    if (!meta) return null;
+
+    const queries = Array.isArray(meta.webSearchQueries) ? meta.webSearchQueries.filter(Boolean) : [];
+    const sources = [];
+    if (Array.isArray(meta.groundingChunks)) {
+        meta.groundingChunks.forEach(chunk => {
+            if (chunk?.web?.uri) {
+                sources.push({
+                    title: chunk.web.title || chunk.web.uri,
+                    uri: chunk.web.uri
+                });
+            }
+        });
+    }
+    if (queries.length === 0 && sources.length === 0) return null;
+    return { queries, sources };
+}
+
+async function fetchGemini(prompt, apiKey, options = {}) {
+    const { useSearchGrounding = false, selectedFormat = 'auto', isChoiceOnly = false } = options;
+
     // Gemini マルチモデル・フォールバック（特定モデルの混雑・新規キー制限・世代移行に自動対応）
     const geminiModels = [
         'gemini-2.5-flash',
@@ -844,20 +984,56 @@ async function fetchGemini(prompt, apiKey) {
     ];
 
     let lastError = null;
+    const responseSchema = buildGeminiResponseSchema(selectedFormat, isChoiceOnly);
 
     for (const model of geminiModels) {
         try {
-            const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
+            // Google検索グラウンディングON時は tools: [{ google_search: {} }] を付与
+            // （※Gemini API仕様上、toolsとresponseMimeType: "application/json"の同時指定は400エラーになるため排他制御）
+            const requestBody = useSearchGrounding
+                ? {
+                    contents: [{ parts: [{ text: prompt }] }],
+                    tools: [{ google_search: {} }],
+                    generationConfig: {
+                        temperature: 0.5
+                    }
+                }
+                : {
                     contents: [{ parts: [{ text: prompt }] }],
                     generationConfig: {
                         temperature: 0.7,
                         responseMimeType: "application/json",
+                        responseSchema: responseSchema
                     }
-                })
+                };
+
+            let response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(requestBody)
             });
+
+            // もし検索グラウンディングが対象モデル・キー環境で非対応(400)だった場合は、即座にStructured Outputsモードで再試行
+            if (!response.ok && response.status === 400 && useSearchGrounding) {
+                const errCheck = await response.text().catch(() => '');
+                if (!errCheck.includes('API_KEY_INVALID')) {
+                    console.warn(`[Gemini] Search grounding unsupported on ${model}, falling back to Structured Outputs.`);
+                    response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            contents: [{ parts: [{ text: prompt }] }],
+                            generationConfig: {
+                                temperature: 0.7,
+                                responseMimeType: "application/json",
+                                responseSchema: responseSchema
+                            }
+                        })
+                    });
+                } else {
+                    throw new Error('AUTH_ERROR');
+                }
+            }
 
             if (!response.ok) {
                 const errText = await response.text().catch(() => '');
@@ -880,10 +1056,13 @@ async function fetchGemini(prompt, apiKey) {
             }
 
             const data = await response.json();
-            const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+            const candidate = data?.candidates?.[0];
+            const parts = candidate?.content?.parts || [];
+            const rawText = parts.map(p => p.text || '').join('\n');
             let quiz = validateAndNormalizeQuiz(parseRobustJSON(rawText));
             quiz.exam = currentExam;
             quiz.category = currentCategory;
+            quiz.grounding = extractGeminiGrounding(candidate);
             return quiz;
         } catch (e) {
             if (e.message === 'AUTH_ERROR') throw e;
@@ -1136,6 +1315,7 @@ function normalizeAnswer(str) {
 function displayQuiz(quiz) {
     stopSpeaking(); // 新しい問題が表示されたら読み上げを停止
     currentQuiz = quiz;
+    resetTutorChat(); // 新しい問題に切り替わったらAI家庭教師チャット履歴をリセット
 
     // 問題文をMarkdownとしてパースして表示（表組み・強調・改行を完全再現）
     questionText.innerHTML = marked.parse(quiz.question || '');
@@ -1231,6 +1411,7 @@ function handleAnswer(selectedIndex, selectedBtn) {
     }
 
     explanationText.innerHTML = marked.parse(currentQuiz.explanation);
+    renderGroundingInfo(currentQuiz);
     
     resultSection.classList.remove('hidden');
     resultSection.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
@@ -1295,6 +1476,7 @@ function handleInputAnswer() {
     }
 
     explanationText.innerHTML = marked.parse(currentQuiz.explanation);
+    renderGroundingInfo(currentQuiz);
     resultSection.classList.remove('hidden');
     resultSection.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 
@@ -1337,6 +1519,299 @@ function handleSelfGradeOverride() {
     renderStats();
     updateReviewBtnState();
     showToast('正解として統計に反映しました');
+}
+
+// Google検索グラウンディング参照元の描画関数
+function renderGroundingInfo(quiz) {
+    if (!groundingInfoBox || !groundingSourcesList) return;
+    groundingSourcesList.innerHTML = '';
+
+    const g = quiz && quiz.grounding;
+    if (!g || ((!g.sources || g.sources.length === 0) && (!g.queries || g.queries.length === 0))) {
+        groundingInfoBox.classList.add('hidden');
+        return;
+    }
+
+    if (Array.isArray(g.queries)) {
+        g.queries.slice(0, 4).forEach(q => {
+            const qChip = document.createElement('span');
+            qChip.className = 'grounding-query-chip';
+            qChip.textContent = `🔍 ${q}`;
+            groundingSourcesList.appendChild(qChip);
+        });
+    }
+
+    if (Array.isArray(g.sources)) {
+        g.sources.slice(0, 5).forEach(src => {
+            const a = document.createElement('a');
+            a.className = 'grounding-source-chip';
+            a.href = src.uri;
+            a.target = '_blank';
+            a.rel = 'noopener noreferrer';
+            a.textContent = `🔗 ${src.title}`;
+            groundingSourcesList.appendChild(a);
+        });
+    }
+
+    groundingInfoBox.classList.remove('hidden');
+}
+
+// ==========================================================================
+// v2.00: AI専門講師への深掘り質問（AI家庭教師チャット）機能
+// ==========================================================================
+
+function resetTutorChat() {
+    currentTutorHistory = [];
+    isTutorLoading = false;
+    if (tutorChatHistory) {
+        tutorChatHistory.innerHTML = '';
+        tutorChatHistory.classList.add('hidden');
+    }
+    if (tutorInput) {
+        tutorInput.value = '';
+        tutorInput.disabled = false;
+    }
+    if (tutorSendBtn) {
+        tutorSendBtn.disabled = false;
+        const tText = tutorSendBtn.querySelector('.btn-text');
+        const tSpin = tutorSendBtn.querySelector('.spinner');
+        if (tText) tText.classList.remove('hidden');
+        if (tSpin) tSpin.classList.add('hidden');
+    }
+    if (tutorChipBtns) {
+        tutorChipBtns.forEach(c => c.disabled = false);
+    }
+}
+
+function setTutorLoadingState(loading) {
+    isTutorLoading = loading;
+    if (tutorInput) tutorInput.disabled = loading;
+    if (tutorSendBtn) {
+        tutorSendBtn.disabled = loading;
+        const tText = tutorSendBtn.querySelector('.btn-text');
+        const tSpin = tutorSendBtn.querySelector('.spinner');
+        if (tText) tText.classList.toggle('hidden', loading);
+        if (tSpin) tSpin.classList.toggle('hidden', !loading);
+    }
+    if (tutorChipBtns) {
+        tutorChipBtns.forEach(c => c.disabled = loading);
+    }
+}
+
+async function handleTutorQuestion(questionStr) {
+    if (!currentQuiz || isTutorLoading || !questionStr) return;
+
+    if (tutorInput) tutorInput.value = '';
+    setTutorLoadingState(true);
+    tutorChatHistory.classList.remove('hidden');
+
+    // ユーザーの質問バブルを追加
+    const userMsgEl = document.createElement('div');
+    userMsgEl.className = 'tutor-msg tutor-msg-user';
+    const roleSpan = document.createElement('span');
+    roleSpan.className = 'tutor-msg-role';
+    roleSpan.textContent = '🙋 あなたの質問';
+    const bodyDiv = document.createElement('div');
+    bodyDiv.textContent = questionStr;
+    userMsgEl.appendChild(roleSpan);
+    userMsgEl.appendChild(bodyDiv);
+    tutorChatHistory.appendChild(userMsgEl);
+
+    // AIのローディングバブルを追加
+    const aiMsgEl = document.createElement('div');
+    aiMsgEl.className = 'tutor-msg tutor-msg-ai';
+    aiMsgEl.innerHTML = `<span class="tutor-msg-role">🎓 AI専門講師</span><div class="markdown-body" style="color:var(--text-secondary);">回答を作成しています...</div>`;
+    tutorChatHistory.appendChild(aiMsgEl);
+    tutorChatHistory.scrollTop = tutorChatHistory.scrollHeight;
+
+    try {
+        const answerMarkdown = await fetchTutorAnswer(questionStr);
+        currentTutorHistory.push({ role: 'user', content: questionStr });
+        currentTutorHistory.push({ role: 'assistant', content: answerMarkdown });
+
+        aiMsgEl.innerHTML = `<span class="tutor-msg-role">🎓 AI専門講師</span><div class="markdown-body question-markdown" style="margin-bottom:0; font-size:0.95rem;">${marked.parse(answerMarkdown)}</div>`;
+        tutorChatHistory.scrollTop = tutorChatHistory.scrollHeight;
+    } catch (e) {
+        console.error('[AI Tutor Error]', e);
+        aiMsgEl.innerHTML = `<span class="tutor-msg-role">🎓 AI専門講師</span><div style="color:var(--error-color);">${formatUserErrorMessage(e)}</div>`;
+    } finally {
+        setTutorLoadingState(false);
+        if (tutorInput) tutorInput.focus();
+    }
+}
+
+async function fetchTutorAnswer(userQuestion) {
+    const engine = localStorage.getItem('ai_engine') || 'gemini';
+    const apiKey = localStorage.getItem(`${engine}_api_key`);
+    if (!apiKey) {
+        apiModal.classList.remove('hidden');
+        throw new Error('API Key missing');
+    }
+
+    const examName = (EXAM_DATA[currentQuiz.exam] && EXAM_DATA[currentQuiz.exam].name) || EXAM_DATA[currentExam].name;
+    const categoryName = currentQuiz.category || currentCategory;
+    const useSearchGrounding = (searchGroundingCheckbox && searchGroundingCheckbox.checked && engine === 'gemini');
+
+    let quizContext = `【対象資格・科目】${examName}（${categoryName}）\n【問題文】\n${currentQuiz.question}\n`;
+    if (currentQuiz.type === 'input') {
+        quizContext += `【模範解答】${currentQuiz.answer}${currentQuiz.unit || ''}\n`;
+    } else if (Array.isArray(currentQuiz.options)) {
+        quizContext += `【選択肢】\n${currentQuiz.options.map((o, i) => `${i + 1}. ${o}`).join('\n')}\n【正解】選択肢 ${Number(currentQuiz.correct_index) + 1}\n`;
+    }
+    quizContext += `【解説】\n${currentQuiz.explanation}\n`;
+
+    let historyText = '';
+    if (currentTutorHistory.length > 0) {
+        historyText = '\n【これまでの質疑応答】\n' + currentTutorHistory.map(h => `${h.role === 'user' ? '受験生' : '講師'}: ${h.content}`).join('\n\n') + '\n';
+    }
+
+    const tutorPrompt = `あなたは「${examName}」の経験豊富で親身な専門講師です。
+現在、受験生が以下の過去問演習に取り組み、解説を読んだうえで追加の質問をしています。
+
+${quizContext}${historyText}
+【受験生からの今回の質問】
+${userQuestion}
+
+【回答のルール】
+- 受験生の疑問にピンポイントで答え、本試験で得点力に直結するように分かりやすく解説してください。
+- 必要に応じてMarkdownの箇条書き、太字、表（テーブル）、具体例、仕訳例などを活用して視覚的に整理してください。
+- JSONではなく、そのまま読めるMarkdownテキストとして出力してください。`;
+
+    if (engine === 'gemini') {
+        const geminiModels = ['gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-2.0-flash'];
+        let lastErr = null;
+        for (const model of geminiModels) {
+            try {
+                const reqBody = {
+                    contents: [{ parts: [{ text: tutorPrompt }] }],
+                    generationConfig: { temperature: 0.6 }
+                };
+                if (useSearchGrounding) {
+                    reqBody.tools = [{ google_search: {} }];
+                }
+                let res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(reqBody)
+                });
+                if (!res.ok && res.status === 400 && useSearchGrounding) {
+                    delete reqBody.tools;
+                    res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(reqBody)
+                    });
+                }
+                if (!res.ok) {
+                    if (res.status === 401) throw new Error('AUTH_ERROR');
+                    lastErr = new Error(res.status === 429 ? 'RATE_LIMIT' : 'SERVER_OVERLOAD');
+                    continue;
+                }
+                const data = await res.json();
+                const parts = data?.candidates?.[0]?.content?.parts || [];
+                const text = parts.map(p => p.text || '').join('\n').trim();
+                if (text) return text;
+            } catch (e) {
+                if (e.message === 'AUTH_ERROR') throw e;
+                lastErr = e;
+            }
+        }
+        throw lastErr || new Error('SERVER_OVERLOAD');
+    }
+
+    if (engine === 'groq') {
+        const groqModels = ['llama-3.3-70b-versatile', 'meta-llama/llama-4-scout-17b-16e-instruct', 'llama-3.1-8b-instant'];
+        let lastErr = null;
+        for (const model of groqModels) {
+            try {
+                const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+                    body: JSON.stringify({
+                        model,
+                        messages: [{ role: 'user', content: tutorPrompt }],
+                        temperature: 0.6
+                    })
+                });
+                if (!res.ok) {
+                    if (res.status === 401) throw new Error('AUTH_ERROR');
+                    lastErr = new Error(res.status === 429 ? 'RATE_LIMIT' : 'SERVER_OVERLOAD');
+                    continue;
+                }
+                const data = await res.json();
+                const text = data?.choices?.[0]?.message?.content?.trim();
+                if (text) return text;
+            } catch (e) {
+                if (e.message === 'AUTH_ERROR') throw e;
+                lastErr = e;
+            }
+        }
+        throw lastErr || new Error('SERVER_OVERLOAD');
+    }
+
+    if (engine === 'openrouter') {
+        const freeModels = ['openrouter/free', 'meta-llama/llama-3.3-70b-instruct:free', 'deepseek/deepseek-chat:free', 'qwen/qwen-2.5-72b-instruct:free'];
+        let lastErr = null;
+        for (const model of freeModels) {
+            try {
+                const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${apiKey}`,
+                        'HTTP-Referer': window.location.href || 'http://localhost',
+                        'X-Title': 'QuaGenius'
+                    },
+                    body: JSON.stringify({
+                        model,
+                        messages: [{ role: 'user', content: tutorPrompt }],
+                        temperature: 0.6
+                    })
+                });
+                if (!res.ok) {
+                    if (res.status === 401) throw new Error('AUTH_ERROR');
+                    lastErr = new Error(res.status === 429 ? 'RATE_LIMIT' : 'SERVER_OVERLOAD');
+                    continue;
+                }
+                const data = await res.json();
+                const text = data?.choices?.[0]?.message?.content?.trim();
+                if (text) return text;
+            } catch (e) {
+                if (e.message === 'AUTH_ERROR') throw e;
+                lastErr = e;
+            }
+        }
+        throw lastErr || new Error('SERVER_OVERLOAD');
+    }
+
+    // OpenAI
+    const openaiModels = ['gpt-4.1-mini', 'gpt-4o-mini'];
+    let lastErr = null;
+    for (const model of openaiModels) {
+        try {
+            const res = await fetch('https://api.openai.com/v1/chat/completions', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+                body: JSON.stringify({
+                    model,
+                    messages: [{ role: 'user', content: tutorPrompt }],
+                    temperature: 0.6
+                })
+            });
+            if (!res.ok) {
+                if (res.status === 401) throw new Error('AUTH_ERROR');
+                lastErr = new Error(res.status === 429 ? 'RATE_LIMIT' : 'SERVER_OVERLOAD');
+                continue;
+            }
+            const data = await res.json();
+            const text = data?.choices?.[0]?.message?.content?.trim();
+            if (text) return text;
+        } catch (e) {
+            if (e.message === 'AUTH_ERROR') throw e;
+            lastErr = e;
+        }
+    }
+    throw lastErr || new Error('SERVER_OVERLOAD');
 }
 
 // Changelogレンダリング関数

@@ -18,7 +18,7 @@
     <div id="app">
         <header>
             <div class="logo">
-                <span class="icon">✨</span> <span class="logo-text">QuaGenius</span> <span class="version-badge clickable-badge" id="versionBadge" title="更新履歴 (Changelog) を見る">v1.12</span>
+                <span class="icon">✨</span> <span class="logo-text">QuaGenius</span> <span class="version-badge clickable-badge" id="versionBadge" title="更新履歴 (Changelog) を見る">v2.00</span>
             </div>
             <div class="header-actions">
                 <button id="statsBtn" class="icon-btn" title="成績・統計">📊</button>
@@ -63,10 +63,14 @@
                     </div>
                 </div>
 
-                <div class="control-group checkbox-group">
+                <div class="control-group checkbox-group options-checkbox-grid">
                     <label class="check-label">
                         <input type="checkbox" id="calcOptionCheckbox">
                         <span>🧮 計算・グラフ(表)問題を優先する</span>
+                    </label>
+                    <label class="check-label grounding-check-label" title="Gemini APIのGoogle検索グラウンディング機能を用いて、最新の法改正・税制改正・統計データをWeb検索しながら作問・解説します（Gemini選択時のみ有効）">
+                        <input type="checkbox" id="searchGroundingCheckbox">
+                        <span>🌐 最新法改正・Web検索連動 <small class="grounding-tag">Gemini</small></span>
                     </label>
                 </div>
 
@@ -159,6 +163,42 @@
                 <div class="explanation-box">
                     <h4>解説</h4>
                     <div id="explanationText" class="markdown-body"></div>
+                    <!-- Google検索グラウンディング情報表示エリア -->
+                    <div id="groundingInfoBox" class="grounding-info-box hidden">
+                        <div class="grounding-info-title">🌐 Google検索グラウンディング（最新法令・Web参照元）</div>
+                        <div id="groundingSourcesList" class="grounding-sources-list"></div>
+                    </div>
+                </div>
+
+                <!-- v2.00: AI専門講師への深掘り質問（AI家庭教師チャット） -->
+                <div id="aiTutorSection" class="ai-tutor-section mt-4">
+                    <div class="ai-tutor-header">
+                        <div class="ai-tutor-title">
+                            <span class="tutor-icon">🎓</span>
+                            <span>AI専門講師にこの問題を深掘り質問する</span>
+                        </div>
+                        <span class="ai-tutor-subtitle">疑問点をその場で解消</span>
+                    </div>
+
+                    <!-- ワンタップ質問チップ -->
+                    <div class="tutor-quick-chips">
+                        <button type="button" class="tutor-chip-btn" data-prompt="この問題の解説を、初学者にも分かりやすいように噛み砕いて具体例付きで教えてください。">💡 初学者向けに噛み砕いて</button>
+                        <button type="button" class="tutor-chip-btn" data-prompt="他の選択肢（誤りの選択肢）がなぜダメなのか、本試験で迷いやすいひっかけポイントを深掘りしてください。">🔍 他の選択肢・ひっかけの理由</button>
+                        <button type="button" class="tutor-chip-btn" data-prompt="この問題の計算過程や仕訳・判断ステップを、1ステップずつ順番に省略せず教えてください。">📐 計算・仕訳の手順を1ステップずつ</button>
+                        <button type="button" class="tutor-chip-btn" data-prompt="この論点に関連して、本試験で一緒に問われやすい周辺知識や効率的な暗記法（語呂合わせ・比較表など）を教えてください。">📘 関連知識・暗記のポイント</button>
+                    </div>
+
+                    <!-- チャット履歴表示コンテナ -->
+                    <div id="tutorChatHistory" class="tutor-chat-history hidden"></div>
+
+                    <!-- 自由質問入力フォーム -->
+                    <div class="tutor-input-row">
+                        <input type="text" id="tutorInput" placeholder="例: なぜここで減価償却費を月割計算するのですか？" autocomplete="off">
+                        <button type="button" id="tutorSendBtn" class="primary-btn tutor-send-btn">
+                            <span class="btn-text">質問する</span>
+                            <div class="spinner hidden"></div>
+                        </button>
+                    </div>
                 </div>
                 
                 <button id="nextBtn" class="secondary-btn mt-4">
