@@ -816,6 +816,31 @@ select:focus, input:focus {
     .markdown-body strong {
         color: black !important;
     }
+    .exp-option-card {
+        background: #ffffff !important;
+        border: 1px solid #ccc !important;
+        color: black !important;
+    }
+    .exp-option-statement {
+        background: #f1f5f9 !important;
+        color: #334155 !important;
+        border-left-color: #64748b !important;
+    }
+    .exp-badge-true {
+        background: #e6f4ea !important;
+        color: #137333 !important;
+        border-color: #137333 !important;
+    }
+    .exp-badge-false {
+        background: #fce8e6 !important;
+        color: #c5221f !important;
+        border-color: #c5221f !important;
+    }
+    .exp-badge-answer {
+        background: #fef7e0 !important;
+        color: #b06000 !important;
+        border-color: #b06000 !important;
+    }
 }
 
 /* --- Mobile Responsive Optimizations for Dashboard --- */
@@ -1425,5 +1450,106 @@ select:focus, input:focus {
         width: 100% !important;
     }
 }
+
+/* ==========================================================================
+   v2.0.1 Extensions: Structured Explanation Cards & Verdict Badges (【正】/【誤】)
+   ========================================================================== */
+
+.exp-section-title {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    font-size: 1.02rem;
+    font-weight: 700;
+    color: #c7d2fe;
+    margin: 1.25rem 0 0.65rem 0;
+    padding-bottom: 0.35rem;
+    border-bottom: 1px solid rgba(99, 102, 241, 0.3);
+}
+
+.exp-section-title:first-child {
+    margin-top: 0.2rem;
+}
+
+.exp-option-card {
+    background: rgba(15, 23, 42, 0.55);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 10px;
+    padding: 0.9rem 1.05rem;
+    margin-bottom: 0.85rem;
+    transition: border-color 0.2s;
+}
+
+.exp-option-card.is-answer-choice {
+    border-color: rgba(250, 204, 21, 0.45);
+    background: rgba(30, 41, 59, 0.72);
+    box-shadow: 0 0 12px rgba(250, 204, 21, 0.08);
+}
+
+.exp-option-header {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-bottom: 0.55rem;
+}
+
+.exp-option-num {
+    font-weight: 800;
+    font-size: 0.98rem;
+    color: #f8fafc;
+    margin-right: 0.2rem;
+}
+
+.exp-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.2rem 0.65rem;
+    border-radius: 6px;
+    font-size: 0.82rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+}
+
+.exp-badge-true {
+    background: rgba(16, 185, 129, 0.18);
+    border: 1px solid rgba(16, 185, 129, 0.5);
+    color: #6ee7b7;
+}
+
+.exp-badge-false {
+    background: rgba(239, 68, 68, 0.18);
+    border: 1px solid rgba(239, 68, 68, 0.5);
+    color: #fca5a5;
+}
+
+.exp-badge-answer {
+    background: rgba(250, 204, 21, 0.18);
+    border: 1px solid rgba(250, 204, 21, 0.55);
+    color: #fde047;
+}
+
+.exp-option-statement {
+    font-size: 0.88rem;
+    color: #94a3b8;
+    background: rgba(255, 255, 255, 0.03);
+    border-left: 3px solid rgba(148, 163, 184, 0.45);
+    padding: 0.45rem 0.75rem;
+    border-radius: 0 6px 6px 0;
+    margin-bottom: 0.55rem;
+    line-height: 1.55;
+}
+
+.exp-option-reason {
+    font-size: 0.95rem;
+    color: var(--text-primary);
+    line-height: 1.7;
+}
+
+.exp-option-reason p:last-child {
+    margin-bottom: 0;
+}
+
 
 

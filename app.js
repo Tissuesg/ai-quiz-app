@@ -82,13 +82,24 @@ const EXAM_DATA = {
     }
 };
 
-// Changelog Data (v1.00 - v2.00)
+// Changelog Data (v1.00 - v2.0.1)
 const CHANGELOG_DATA = [
+    {
+        version: "v2.0.1",
+        date: "2026/11/01",
+        tag: "最新・解説改善",
+        latest: true,
+        items: [
+            "解説文の各選択肢に【正】正しい選択肢（正しい記述）／【誤】誤った選択肢（誤りの記述）および【🎯本問の正解】のカラーバッジを自動付与し、一目で正誤が判別できるよう視認性を大幅向上",
+            "Web検索連動（Google検索グラウンディング）利用時に解説文の正誤ラベルが省略されたり改行が空いたりする現象を、プロンプト改善とクライアント側自動構造化パーサーの二重対策で完全解消",
+            "Web検索連動・通常モード・全AIエンジン・全7資格×出題形式の組み合わせにおけるJSON解析および出題形式ガードの堅牢化"
+        ]
+    },
     {
         version: "v2.00",
         date: "2026/11/01",
         tag: "メジャーアップデート",
-        latest: true,
+        latest: false,
         items: [
             "🎓 AI専門講師への深掘り質問（AI家庭教師チャット）機能を搭載（解説画面からワンタップ質問チップや自由入力で疑問点を対話形式で即座に解消）",
             "🌐 Google検索グラウンディング連動モードを搭載（Gemini APIのWeb検索ツールにより最新の法改正・税制改正・会計基準・統計データを参照して作問・解説し、参照元リンクを表示）",
@@ -717,6 +728,33 @@ async function fetchQuizData() {
 - 記述・数値入力問題の場合、正解の数値（例: "120,000"）に加え、カンマなしや単位付きのゆらぎを "acceptable_answers" 配列に複数記載してください。また単位（例: "円"）を "unit" に指定してください。`;
     }
 
+    const forceChoice = selectedFormat === 'choice' || (selectedFormat === 'auto' && isChoiceOnly);
+    const forceInput = selectedFormat === 'input';
+
+    const choiceSchemaBlock = `■ 4択問題 (type: "choice")
+{
+  "type": "choice",
+  "question": "問題文（Markdown形式の表や資料を含めてよい）",
+  "options": ["選択肢1", "選択肢2", "選択肢3", "選択肢4"],
+  "correct_index": 0,
+  "explanation": "【出題の趣旨】\\n...\\n\\n【詳細解説】\\n選択肢1：【正】（正しい選択肢）【★本問の正解】\\n理由の解説...\\n\\n選択肢2：【誤】（誤った選択肢）\\n理由の解説...\\n\\n選択肢3：【誤】（誤った選択肢）\\n理由の解説...\\n\\n選択肢4：【誤】（誤った選択肢）\\n理由の解説...\\n\\n【ワンポイントアドバイス】\\n..."
+}`;
+
+    const inputSchemaBlock = `■ 記述・数値入力問題 (type: "input")
+{
+  "type": "input",
+  "question": "問題文（Markdown形式の表や資料を含めてよい）",
+  "answer": "120,000",
+  "acceptable_answers": ["120000", "120,000", "120000円", "120,000円"],
+  "unit": "円",
+  "input_label": "金額を入力してください (半角数字):",
+  "explanation": "【出題の趣旨】\\n...\\n\\n【詳細解説】\\n【模範解答と結論】\\n正解の導出ロジックや計算過程・仕訳手順の詳細解説...\\n\\n【ワンポイントアドバイス】\\n..."
+}`;
+
+    const outputSchemaSection = forceChoice
+        ? choiceSchemaBlock
+        : (forceInput ? inputSchemaBlock : `${choiceSchemaBlock}\n\nまたは\n\n${inputSchemaBlock}`);
+
     let prompt = `あなたは「${examName}」の専門講師です。
 以下の要件に従って、「${currentCategory}」分野の本試験レベルの実践的な問題を1問作成してください。
 
@@ -729,32 +767,16 @@ ${useSearchGrounding ? '・【Google検索グラウンディング連動】必�
 ・解説(explanation)は、必ず以下の構成（マークダウン形式）で出力すること。
    - 【出題の趣旨】
      （この問題で問われている核心部分を解説）
-   - 【詳細解説】（4択の場合は各選択肢の正誤判定と理由、記述式の場合は正解の導出ロジックや計算過程・仕訳手順を深く詳細に解説すること。文字数を惜しまずに解説してください）
+   - 【詳細解説】
+     ・4択問題の場合は、各選択肢の先頭に必ず「選択肢1：【正】（正しい選択肢）」または「選択肢1：【誤】（誤った選択肢）」（※本問の正解となる選択肢にはさらに「【★本問の正解】」も併記）のように、パッと見で各選択肢の正誤が判別できる見出しラベルを必ず明記してから理由を詳しく解説すること。
+     ・記述式問題の場合は、冒頭に「【模範解答と結論】」を明示した上で、正解の導出ロジックや計算過程・仕訳手順を深く詳細に解説すること。
    - 【ワンポイントアドバイス】
      （実務や本試験対策に役立つTips）
 
 【出力形式】
-出力は必ず以下のJSON形式のみとすること（全体を\`\`\`json等で囲まないこと）。
+出力は必ず以下のJSON形式のみとすること（全体を\`\`\`json等で囲まないこと。前置きや後書きも一切出力しないこと）。
 
-■ 4択問題の場合 (type: "choice")
-{
-  "type": "choice",
-  "question": "問題文（Markdown形式の表や資料を含めてよい）",
-  "options": ["選択肢1", "選択肢2", "選択肢3", "選択肢4"],
-  "correct_index": 0,
-  "explanation": "詳細な解説をここに記述"
-}
-
-■ 記述・数値入力問題の場合 (type: "input")
-{
-  "type": "input",
-  "question": "問題文（Markdown形式の表や資料を含めてよい）",
-  "answer": "120,000",
-  "acceptable_answers": ["120000", "120,000", "120000円", "120,000円"],
-  "unit": "円",
-  "input_label": "金額を入力してください (半角数字):",
-  "explanation": "詳細な解説をここに記述"
-}`;
+${outputSchemaSection}`;
 
     // 自動リトライ用のラッパー関数（429レート制限、503サーバー過負荷、スリープ復帰直後のネットワーク切断、JSONパース崩れに対応）
     const fetchWithRetry = async (fetcher, retries = 2, attempt = 1) => {
@@ -814,7 +836,11 @@ function formatUserErrorMessage(e) {
 }
 
 // 4択・記述の両形式に対応した共通クイズ構造バリデーション＆正規化関数
-function validateAndNormalizeQuiz(quiz) {
+function validateAndNormalizeQuiz(quiz, options = {}) {
+    const { selectedFormat = 'auto', isChoiceOnly = false } = options;
+    const forceChoice = selectedFormat === 'choice' || (selectedFormat === 'auto' && isChoiceOnly);
+    const forceInput = selectedFormat === 'input';
+
     if (!quiz || typeof quiz !== 'object') {
         throw new Error('INVALID_QUIZ_FORMAT');
     }
@@ -823,6 +849,15 @@ function validateAndNormalizeQuiz(quiz) {
     }
 
     const isInput = quiz.type === 'input' || (!Array.isArray(quiz.options) || quiz.options.length === 0);
+
+    // 4択専用試験（宅建・ITパス等）のおまかせ時や4択指定時に記述問題が返ってきた場合は不正としてリトライさせる
+    if (forceChoice && isInput) {
+        throw new Error('INVALID_QUIZ_FORMAT');
+    }
+    // 記述指定時に4択問題が返ってきた場合も不正としてリトライさせる
+    if (forceInput && !isInput) {
+        throw new Error('INVALID_QUIZ_FORMAT');
+    }
 
     if (isInput) {
         if (quiz.answer === undefined || quiz.answer === null || String(quiz.answer).trim() === '') {
@@ -846,6 +881,45 @@ function validateAndNormalizeQuiz(quiz) {
     }
 
     return quiz;
+}
+
+// JSON文字列リテラルの内部にある未エスケープの改行・タブ・制御文字のみを安全にエスケープする関数
+function escapeControlCharsInJsonStrings(str) {
+    let result = '';
+    let inString = false;
+    let isEscaped = false;
+
+    for (let i = 0; i < str.length; i++) {
+        const ch = str[i];
+        if (!inString) {
+            if (ch === '"') {
+                inString = true;
+            }
+            result += ch;
+        } else {
+            if (isEscaped) {
+                isEscaped = false;
+                result += ch;
+            } else if (ch === '\\') {
+                isEscaped = true;
+                result += ch;
+            } else if (ch === '"') {
+                inString = false;
+                result += ch;
+            } else if (ch === '\n') {
+                result += '\\n';
+            } else if (ch === '\r') {
+                result += '\\r';
+            } else if (ch === '\t') {
+                result += '\\t';
+            } else if (ch.charCodeAt(0) < 0x20) {
+                result += '';
+            } else {
+                result += ch;
+            }
+        }
+    }
+    return result;
 }
 
 // AIが余計な文字（思考ログ<think>やマークダウン等）を含めても強制的にJSONを抽出・整形する関数
@@ -874,15 +948,9 @@ function parseRobustJSON(text) {
     try {
         return JSON.parse(cleaned);
     } catch (e1) {
-        // 2回目の試行：文字列内の生の改行やタブ・特殊制御文字を自動補正
+        // 2回目の試行：JSON文字列リテラル内の生の改行やタブ・特殊制御文字を安全にエスケープ補正
         try {
-            const sanitized = cleaned
-                .replace(/[\u0000-\u001F]+/g, (c) => {
-                    if (c === '\n') return '\\n';
-                    if (c === '\r') return '\\r';
-                    if (c === '\t') return '\\t';
-                    return '';
-                });
+            const sanitized = escapeControlCharsInJsonStrings(cleaned);
             return JSON.parse(sanitized);
         } catch (e2) {
             console.error('Raw LLM response parsing failed:', text);
@@ -1059,7 +1127,7 @@ async function fetchGemini(prompt, apiKey, options = {}) {
             const candidate = data?.candidates?.[0];
             const parts = candidate?.content?.parts || [];
             const rawText = parts.map(p => p.text || '').join('\n');
-            let quiz = validateAndNormalizeQuiz(parseRobustJSON(rawText));
+            let quiz = validateAndNormalizeQuiz(parseRobustJSON(rawText), options);
             quiz.exam = currentExam;
             quiz.category = currentCategory;
             quiz.grounding = extractGeminiGrounding(candidate);
@@ -1074,7 +1142,7 @@ async function fetchGemini(prompt, apiKey, options = {}) {
     throw lastError || new Error('SERVER_OVERLOAD');
 }
 
-async function fetchOpenAI(prompt, apiKey) {
+async function fetchOpenAI(prompt, apiKey, options = {}) {
     // OpenAI マルチモデル・フォールバック（最新のgpt-4.1-miniとgpt-4o-miniを順次試行）
     const openaiModels = [
         'gpt-4.1-mini',
@@ -1116,7 +1184,7 @@ async function fetchOpenAI(prompt, apiKey) {
             }
 
             const data = await response.json();
-            let quiz = validateAndNormalizeQuiz(parseRobustJSON(data?.choices?.[0]?.message?.content));
+            let quiz = validateAndNormalizeQuiz(parseRobustJSON(data?.choices?.[0]?.message?.content), options);
             quiz.exam = currentExam;
             quiz.category = currentCategory;
             return quiz;
@@ -1130,7 +1198,7 @@ async function fetchOpenAI(prompt, apiKey) {
     throw lastError || new Error('SERVER_OVERLOAD');
 }
 
-async function fetchGroq(prompt, apiKey) {
+async function fetchGroq(prompt, apiKey, options = {}) {
     // Groq マルチモデル・フォールバック（Llama 3.3 70B -> Llama 4 Scout -> Llama 3.1 8B）
     const groqModels = [
         'llama-3.3-70b-versatile',
@@ -1173,7 +1241,7 @@ async function fetchGroq(prompt, apiKey) {
             }
 
             const data = await response.json();
-            let quiz = validateAndNormalizeQuiz(parseRobustJSON(data?.choices?.[0]?.message?.content));
+            let quiz = validateAndNormalizeQuiz(parseRobustJSON(data?.choices?.[0]?.message?.content), options);
             quiz.exam = currentExam;
             quiz.category = currentCategory;
             return quiz;
@@ -1187,7 +1255,7 @@ async function fetchGroq(prompt, apiKey) {
     throw lastError || new Error('SERVER_OVERLOAD');
 }
 
-async function fetchOpenRouter(prompt, apiKey) {
+async function fetchOpenRouter(prompt, apiKey, options = {}) {
     // OpenRouterの無料モデルリスト（公式自動ルーター openrouter/free を最優先に順次フォールバック）
     const freeModels = [
         'openrouter/free',
@@ -1257,7 +1325,7 @@ async function fetchOpenRouter(prompt, apiKey) {
             }
 
             try {
-                let quiz = validateAndNormalizeQuiz(parseRobustJSON(rawContent));
+                let quiz = validateAndNormalizeQuiz(parseRobustJSON(rawContent), options);
                 quiz.exam = currentExam;
                 quiz.category = currentCategory;
                 console.log(`[OpenRouter] SUCCESS with model: ${model}`);
@@ -1410,7 +1478,7 @@ function handleAnswer(selectedIndex, selectedBtn) {
         inputResultFeedback.classList.add('hidden');
     }
 
-    explanationText.innerHTML = marked.parse(currentQuiz.explanation);
+    explanationText.innerHTML = formatExplanationHTML(currentQuiz.explanation, currentQuiz);
     renderGroundingInfo(currentQuiz);
     
     resultSection.classList.remove('hidden');
@@ -1475,7 +1543,7 @@ function handleInputAnswer() {
         overrideCorrectBtn.textContent = '🔄 正解扱いにする（自己採点救済）';
     }
 
-    explanationText.innerHTML = marked.parse(currentQuiz.explanation);
+    explanationText.innerHTML = formatExplanationHTML(currentQuiz.explanation, currentQuiz);
     renderGroundingInfo(currentQuiz);
     resultSection.classList.remove('hidden');
     resultSection.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
@@ -1519,6 +1587,215 @@ function handleSelfGradeOverride() {
     renderStats();
     updateReviewBtnState();
     showToast('正解として統計に反映しました');
+}
+
+// ==========================================================================
+// v2.0.1: 解説文の自動構造化＆【正】/【誤】バッジ付与フォーマッター
+// ==========================================================================
+
+function hasLeadingVerdictLabel(text) {
+    if (!text) return false;
+    const s = text.trim().replace(/^[\s\*・:：\-—]+/, '');
+    return /^(?:【\s*(?:正|誤|正しい[^】]*|誤り[^】]*|誤った[^】]*|不適切[^】]*)\s*】|\[(?:正|誤|正しい|誤り)\]|（(?:正|誤|正しい[^）]*|誤り[^）]*|誤った[^）]*)）|\((?:正|誤|正しい[^)]*|誤り[^)]*|誤った[^)]*)\)|[○◯⭕×✕❌]|(?:正しい選択肢|誤った選択肢|正しい記述|誤った記述|誤りの記述))/u.test(s);
+}
+
+function detectOptionVerdict(headLine, bodyText, quiz, optIdx) {
+    const firstLine = (headLine || bodyText.split('\n').find(l => l.trim() !== '') || '').trim()
+        .replace(/^[\s\*・:：\-—]+/, '');
+
+    // 1. 先頭ラベルによる明示的な【正】【誤】判定
+    if (/^(?:【\s*(?:正|正しい[^】]*)\s*】|\[(?:正|正しい)\]|（(?:正|正しい[^）]*)）|\((?:正|正しい[^)]*)\)|[○◯⭕]|正しい選択肢|正しい記述|正しい(?=[。．・\s]|です))/u.test(firstLine)) {
+        return 'true';
+    }
+    if (/^(?:【\s*(?:誤|誤り|誤った[^】]*|不適切[^】]*)\s*】|\[(?:誤|誤り)\]|（(?:誤|誤り|誤った[^）]*)）|\((?:誤|誤り|誤った[^)]*)\)|[×✕❌]|誤った選択肢|誤った記述|誤りの記述|誤り(?=[。．・\s]|です)|不適切(?=[。．・\s]|です))/u.test(firstLine)) {
+        return 'false';
+    }
+
+    // 2. 本文中の結論センテンスによる判定（Web検索連動時など「選択肢1：... \n この記述は正しいです。」のパターン）
+    const combined = `${headLine}\n${bodyText}`;
+    const headFirstSentence = (headLine.trim().split(/[。\n]/)[0] || '').trim();
+    const bodyFirstSentence = (bodyText.trim().split(/[。\n]/)[0] || '').trim();
+
+    const falseSentenceRegex = /(?:この記述は|本肢は|本選択肢は|当該記述は|記述は|選択肢[1-4１-４]は)?\s*(?:誤りです|誤っています|誤った記述です|誤った選択肢です|不適切です|妥当ではありません|誤りとなります|誤りである|不適切である|正しくありません)|【誤】|【誤り】|【誤った選択肢】/u;
+    const trueSentenceRegex = /(?:この記述は|本肢は|本選択肢は|当該記述は|記述は|選択肢[1-4１-４]は)?\s*(?:正しいです|正しい記述です|正しい選択肢です|適切です|妥当です|正しいといえます|正しいとなります|正しいである|適切である)|【正】|【正しい】|【正しい選択肢】/u;
+
+    for (const s of [headFirstSentence, bodyFirstSentence]) {
+        if (!s) continue;
+        // 「前半は正しいですが、後半が誤りです」のような複文では後半の結論を優先
+        if (/(?:ですが|ものの|が、)[^。]*?(?:誤り|不適切|正しくない)/u.test(s)) return 'false';
+        if (/(?:ですが|ものの|が、)[^。]*?(?:正しい|適切|妥当)/u.test(s)) return 'true';
+        if (falseSentenceRegex.test(s)) return 'false';
+        if (trueSentenceRegex.test(s)) return 'true';
+    }
+
+    if (/(?:したがって|よって|ゆえに)[^。]*?(?:誤り|不適切|正しくない)/u.test(combined) || falseSentenceRegex.test(combined)) {
+        return 'false';
+    }
+    if (/(?:したがって|よって|ゆえに)[^。]*?(?:正しい|適切|妥当)/u.test(combined) || trueSentenceRegex.test(combined)) {
+        return 'true';
+    }
+
+    // 3. 問題文の問い方（「誤っているものはどれか」等）と correct_index からのフォールバック推論
+    if (quiz && quiz.correct_index !== undefined) {
+        const isAnswer = (optIdx === Number(quiz.correct_index));
+        const asksForFalse = /誤っている|不適切な|妥当でない|誤りの|正しくない/.test(quiz.question || '');
+        if (asksForFalse) {
+            return isAnswer ? 'false' : 'true';
+        }
+        return isAnswer ? 'true' : 'false';
+    }
+
+    return null;
+}
+
+function stripLeadingVerdictLabels(text) {
+    if (!text) return '';
+    let s = text.trim();
+    // 先頭の【正】【誤】【正しい選択肢】【誤った選択肢】【★本問の正解】等を繰り返し除去
+    const labelPattern = /^(?:[\s\*・:：\-—🎯⭕❌○◯×✕]+|【\s*(?:正|誤|正しい[^】]*|誤り[^】]*|誤った[^】]*|不適切[^】]*|★?本問の正解|正解)\s*】|\[(?:正|誤|正しい|誤り|正解)\]|（(?:正|誤|正しい選択肢|誤った選択肢|正しい記述|誤った記述|誤りの記述|本問の正解|正解)）|\((?:正|誤|正しい選択肢|誤った選択肢|正しい記述|誤った記述|正解)\)|(?:正しい選択肢|誤った選択肢|正しい記述|誤った記述)(?=[\s:：・。．]|$))+/u;
+    s = s.replace(labelPattern, '').replace(/^[\s\*・:：\-—]+/, '').trim();
+    return s;
+}
+
+function renderOptionExplanationCard(optBlock, quiz) {
+    const circledMap = { '①': '1', '②': '2', '③': '3', '④': '4' };
+    const numStr = (circledMap[optBlock.num] || optBlock.num).replace(/[１-４]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0));
+    const num = parseInt(numStr, 10);
+    const optIdx = num - 1;
+    const isAnswerChoice = quiz && Number(quiz.correct_index) === optIdx;
+
+    const rawHead = (optBlock.headLine || '').trim();
+    const rawBody = optBlock.bodyLines.join('\n').trim();
+    const verdict = detectOptionVerdict(rawHead, rawBody, quiz, optIdx);
+
+    const headHadBadge = hasLeadingVerdictLabel(rawHead);
+    const cleanedHead = stripLeadingVerdictLabels(rawHead);
+    const cleanedBody = stripLeadingVerdictLabels(rawBody);
+
+    let badgeHtml = '';
+    if (verdict === 'true') {
+        badgeHtml += `<span class="exp-badge exp-badge-true">⭕ 【正】正しい選択肢</span>`;
+    } else if (verdict === 'false') {
+        badgeHtml += `<span class="exp-badge exp-badge-false">❌ 【誤】誤った選択肢</span>`;
+    }
+    if (isAnswerChoice) {
+        badgeHtml += `<span class="exp-badge exp-badge-answer">🎯 本問の正解</span>`;
+    }
+
+    let contentHtml = '';
+    // 1行目に【正】【誤】ラベルが無く、かつ2行目以降に「この記述は正しいです」等の解説本文がある場合は、1行目を「選択肢文の引用」として分離表示
+    if (!headHadBadge && cleanedHead && cleanedBody) {
+        contentHtml = `
+            <div class="exp-option-statement">${marked.parseInline(cleanedHead)}</div>
+            <div class="exp-option-reason">${marked.parse(cleanedBody)}</div>
+        `;
+    } else {
+        const mergedReason = [cleanedHead, cleanedBody].filter(Boolean).join('\n\n');
+        contentHtml = `<div class="exp-option-reason">${marked.parse(mergedReason)}</div>`;
+    }
+
+    return `
+        <div class="exp-option-card ${isAnswerChoice ? 'is-answer-choice' : ''}">
+            <div class="exp-option-header">
+                <span class="exp-option-num">選択肢 ${num}</span>
+                ${badgeHtml}
+            </div>
+            ${contentHtml}
+        </div>
+    `;
+}
+
+function formatExplanationHTML(rawExplanation, quiz) {
+    if (!rawExplanation || typeof rawExplanation !== 'string') return '';
+
+    // 過剰な連続改行を整理
+    const normalized = rawExplanation
+        .replace(/\r\n/g, '\n')
+        .replace(/[ \t]+\n/g, '\n')
+        .replace(/\n{3,}/g, '\n\n')
+        .trim();
+
+    const lines = normalized.split('\n');
+    const isChoiceQuiz = !quiz || (quiz.type !== 'input' && Array.isArray(quiz.options) && quiz.options.length > 0);
+
+    const secHeaderRegex = /^[\s>\-\*#]*\**【(出題の趣旨|詳細解説|ワンポイントアドバイス|模範解答[^】]*)】\**[\s:：]*(.*)$/;
+    const explicitOptRegex = /^[\s>\-\*]*\**(?:選択肢|肢)\s*([1-4１-４])\**[\s:：・\-—]*(.*)$/;
+    const numberedOptRegex = /^[\s>\-\*]*\**(?:([1-4１-４])[\.．:：）\)]|([①②③④]))\**[\s:：・\-—]*(.*)$/;
+
+    let htmlParts = [];
+    let mdBuffer = [];
+    let currentOptBlock = null;
+    let inDetailSection = false;
+
+    const flushMdBuffer = () => {
+        const text = mdBuffer.join('\n').trim();
+        if (text) {
+            htmlParts.push(marked.parse(text));
+        }
+        mdBuffer = [];
+    };
+
+    const flushOptBlock = () => {
+        if (currentOptBlock) {
+            htmlParts.push(renderOptionExplanationCard(currentOptBlock, quiz));
+            currentOptBlock = null;
+        }
+    };
+
+    for (const line of lines) {
+        const secMatch = line.match(secHeaderRegex);
+        if (secMatch) {
+            flushOptBlock();
+            flushMdBuffer();
+            const secTitle = secMatch[1];
+            const secRest = (secMatch[2] || '').trim();
+            inDetailSection = secTitle.includes('詳細');
+            const icon = secTitle.includes('趣旨') ? '🎯' : (secTitle.includes('詳細') ? '📖' : (secTitle.includes('アドバイス') ? '💡' : '✅'));
+            htmlParts.push(`<div class="exp-section-title">${icon} 【${secTitle}】</div>`);
+            if (secRest) {
+                mdBuffer.push(secRest);
+            }
+            continue;
+        }
+
+        if (isChoiceQuiz) {
+            const optMatch = line.match(explicitOptRegex);
+            if (optMatch) {
+                flushOptBlock();
+                flushMdBuffer();
+                currentOptBlock = {
+                    num: optMatch[1],
+                    headLine: optMatch[2] || '',
+                    bodyLines: []
+                };
+                continue;
+            }
+            if (inDetailSection) {
+                const numMatch = line.match(numberedOptRegex);
+                if (numMatch) {
+                    flushOptBlock();
+                    flushMdBuffer();
+                    currentOptBlock = {
+                        num: numMatch[1] || numMatch[2],
+                        headLine: numMatch[3] || '',
+                        bodyLines: []
+                    };
+                    continue;
+                }
+            }
+        }
+
+        if (currentOptBlock) {
+            currentOptBlock.bodyLines.push(line);
+        } else {
+            mdBuffer.push(line);
+        }
+    }
+
+    flushOptBlock();
+    flushMdBuffer();
+
+    return htmlParts.join('\n');
 }
 
 // Google検索グラウンディング参照元の描画関数
