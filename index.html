@@ -17,7 +17,7 @@
     <div id="app">
         <header>
             <div class="logo">
-                <span class="icon">✨</span> <span class="logo-text">QuaGenius</span> <span class="version-badge clickable-badge" id="versionBadge" title="更新履歴 (Changelog) を見る">v2.10</span>
+                <span class="icon">✨</span> <span class="logo-text">QuaGenius</span> <span class="version-badge clickable-badge" id="versionBadge" title="更新履歴 (Changelog) を見る">v2.1.1</span>
             </div>
             <div class="header-actions">
                 <button id="bookmarksHeaderBtn" class="icon-btn" title="ブックマーク一覧（保存した良問・解説・チャット）">⭐</button>
@@ -280,72 +280,74 @@
 
     <!-- Stats Modal -->
     <div id="statsModal" class="modal hidden">
-        <div class="modal-content glass-card stats-modal-content" style="max-width: 850px; width: 100%;">
-            <div class="modal-header">
+        <div class="modal-content glass-card stats-modal-content" style="max-width: 860px; width: 100%;">
+            <div class="modal-header stats-modal-header">
                 <h2>📊 成績・統計ダッシュボード</h2>
-                <button id="closeStatsBtn" class="icon-btn">✖</button>
+                <button id="closeStatsBtn" class="icon-btn" title="閉じる (Esc)">✖</button>
             </div>
             
-            <!-- 2カラムレイアウト用のグリッドコンテナ -->
-            <div id="statsDashboardGrid" class="stats-dashboard-grid mt-4">
+            <div class="stats-modal-body">
+                <!-- 2カラムレイアウト用のグリッドコンテナ -->
+                <div id="statsDashboardGrid" class="stats-dashboard-grid">
+                    
+                    <!-- 左カラム: 実績値 & グラフ -->
+                    <div class="stats-left-col">
+                        <div class="stats-overview">
+                            <div class="stat-box">
+                                <div class="stat-label">総出題数</div>
+                                <div class="stat-value" id="totalQuestionsStat">0</div>
+                            </div>
+                            <div class="stat-box">
+                                <div class="stat-label">総合正答率</div>
+                                <div class="stat-value" id="overallAccuracyStat">0%</div>
+                            </div>
+                            <div class="stat-box">
+                                <div class="stat-label">⏱ 本日の学習時間</div>
+                                <div class="stat-value stat-value-time" id="todayStudyTimeStat">0分 0秒</div>
+                            </div>
+                        </div>
+
+                        <!-- Weekly Progress Chart -->
+                        <div class="stats-details">
+                            <h3>📈 直近7日間の学習状況</h3>
+                            <div id="weeklyChartContainer" class="weekly-chart-container mt-2">
+                                <!-- JSで動的に棒グラフを描画 -->
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 右カラム: 分野別成績 -->
+                    <div class="stats-right-col">
+                        <div class="stats-details">
+                            <h3>分野別の成績</h3>
+                            <div id="categoryStatsList" class="category-stats-list mt-2">
+                                <!-- Populated by JS -->
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
                 
-                <!-- 左カラム: 実績値 & グラフ -->
-                <div class="stats-left-col">
-                    <div class="stats-overview">
-                        <div class="stat-box">
-                            <div class="stat-label">総出題数</div>
-                            <div class="stat-value" id="totalQuestionsStat">0</div>
-                        </div>
-                        <div class="stat-box">
-                            <div class="stat-label">総合正答率</div>
-                            <div class="stat-value" id="overallAccuracyStat">0%</div>
-                        </div>
-                        <div class="stat-box" style="grid-column: span 2;">
-                            <div class="stat-label">⏱ 本日の学習時間</div>
-                            <div class="stat-value" id="todayStudyTimeStat">0分 0秒</div>
-                        </div>
+                <!-- v2.10: データ保護・外部バックアップ書き出し＆復元（クラウドドライブ保存対応） -->
+                <div class="backup-restore-section border-top">
+                    <div class="backup-restore-header">
+                        <h3>☁️ 学習データの外部バックアップ・復元</h3>
+                        <p class="backup-restore-desc">ブラウザのキャッシュ削除や機種変更に備えて、成績・復習ストック・ブックマーク（AI講師チャット履歴含む）をJSONファイルとしてGoogleドライブやiCloud、端末内に保存・復元できます。</p>
                     </div>
-
-                    <!-- Weekly Progress Chart -->
-                    <div class="stats-details mt-4">
-                        <h3>📈 直近7日間の学習状況</h3>
-                        <div id="weeklyChartContainer" class="weekly-chart-container mt-2">
-                            <!-- JSで動的に棒グラフを描画 -->
-                        </div>
+                    <div class="backup-restore-actions">
+                        <button type="button" id="exportDataBtn" class="secondary-btn flex-1">
+                            💾 バックアップを保存 (.json)
+                        </button>
+                        <button type="button" id="importDataBtn" class="secondary-btn flex-1">
+                            📂 バックアップから復元
+                        </button>
+                        <input type="file" id="importDataInput" accept=".json,application/json" class="hidden">
                     </div>
                 </div>
-
-                <!-- 右カラム: 分野別成績 -->
-                <div class="stats-right-col">
-                    <div class="stats-details">
-                        <h3>分野別の成績</h3>
-                        <div id="categoryStatsList" class="category-stats-list mt-2">
-                            <!-- Populated by JS -->
-                        </div>
-                    </div>
+                
+                <div class="modal-actions stats-modal-footer border-top">
+                    <button id="resetStatsBtn" class="danger-btn">データをリセット</button>
                 </div>
-
-            </div>
-            
-            <!-- v2.10: データ保護・外部バックアップ書き出し＆復元（クラウドドライブ保存対応） -->
-            <div class="backup-restore-section mt-4 border-top pt-4">
-                <div class="backup-restore-header">
-                    <h3>☁️ 学習データの外部バックアップ・復元</h3>
-                    <p class="backup-restore-desc">ブラウザのキャッシュ削除や機種変更に備えて、成績・復習ストック・ブックマーク（AI講師チャット履歴含む）をJSONファイルとしてGoogleドライブやiCloud、端末内に保存・復元できます。</p>
-                </div>
-                <div class="backup-restore-actions mt-3">
-                    <button type="button" id="exportDataBtn" class="secondary-btn flex-1">
-                        💾 バックアップを保存 (.json)
-                    </button>
-                    <button type="button" id="importDataBtn" class="secondary-btn flex-1">
-                        📂 バックアップから復元
-                    </button>
-                    <input type="file" id="importDataInput" accept=".json,application/json" class="hidden">
-                </div>
-            </div>
-            
-            <div class="modal-actions mt-4 border-top pt-4">
-                <button id="resetStatsBtn" class="danger-btn">データをリセット</button>
             </div>
         </div>
     </div>

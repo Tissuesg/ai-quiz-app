@@ -326,19 +326,35 @@ select:focus, input:focus {
     left: 0;
     width: 100%;
     height: 100%;
-    background: rgba(0, 0, 0, 0.5);
+    background: rgba(0, 0, 0, 0.55);
     backdrop-filter: blur(5px);
     display: flex;
     justify-content: center;
     align-items: center;
     z-index: 1000;
-    padding: 1rem;
+    padding: clamp(0.6rem, 2vh, 1.25rem);
+    overflow-y: auto;
+    overscroll-behavior: contain;
 }
 
 .modal-content {
     width: 100%;
     max-width: 500px;
+    max-height: calc(100vh - 2rem);
+    max-height: calc(100dvh - 1.5rem);
+    overflow-y: auto;
+    overscroll-behavior: contain;
     animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.modal-content::-webkit-scrollbar,
+.stats-modal-body::-webkit-scrollbar {
+    width: 6px;
+}
+.modal-content::-webkit-scrollbar-thumb,
+.stats-modal-body::-webkit-scrollbar-thumb {
+    background: rgba(99, 102, 241, 0.55);
+    border-radius: 3px;
 }
 
 .modal-content h2 { margin-bottom: 1rem; }
@@ -351,7 +367,7 @@ select:focus, input:focus {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-top: 2rem;
+    margin-top: 1.5rem;
 }
 
 /* Toast */
@@ -426,35 +442,44 @@ select:focus, input:focus {
 
 .stats-overview {
     display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 1rem;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.75rem;
 }
 
 .stat-box {
     background: rgba(255,255,255,0.05);
-    padding: 1.5rem;
+    padding: 0.85rem 0.6rem;
     border-radius: 0.5rem;
     text-align: center;
     border: 1px solid var(--card-border);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
 }
 
 .stat-label {
     color: var(--text-secondary);
-    font-size: 0.85rem;
-    margin-bottom: 0.5rem;
+    font-size: 0.78rem;
+    margin-bottom: 0.3rem;
+    white-space: nowrap;
 }
 
 .stat-value {
-    font-size: 2rem;
+    font-size: 1.5rem;
     font-weight: 800;
     color: var(--primary-color);
+    line-height: 1.2;
+}
+
+.stat-value.stat-value-time {
+    font-size: 1.25rem;
 }
 
 .category-stats-list {
     display: flex;
     flex-direction: column;
-    gap: 1rem;
-    max-height: 300px;
+    gap: 0.75rem;
+    max-height: clamp(170px, 27vh, 270px);
     overflow-y: auto;
     padding-right: 0.5rem;
 }
@@ -470,15 +495,15 @@ select:focus, input:focus {
 
 .category-stat-item {
     background: rgba(0,0,0,0.2);
-    padding: 1rem;
+    padding: 0.75rem 0.9rem;
     border-radius: 0.5rem;
 }
 
 .category-stat-header {
     display: flex;
     justify-content: space-between;
-    margin-bottom: 0.5rem;
-    font-size: 0.9rem;
+    margin-bottom: 0.4rem;
+    font-size: 0.86rem;
 }
 
 .progress-bar {
@@ -500,9 +525,9 @@ select:focus, input:focus {
     color: var(--error-color);
     border: 1px solid var(--error-color);
     width: 100%;
-    padding: 1rem;
+    padding: 0.75rem 1rem;
     border-radius: 0.5rem;
-    font-size: 1rem;
+    font-size: 0.95rem;
     font-weight: 600;
     cursor: pointer;
     transition: all 0.2s;
@@ -599,17 +624,45 @@ select:focus, input:focus {
 }
 
 /* --- Stats Dashboard Grid Styles --- */
+.stats-modal-content {
+    display: flex;
+    flex-direction: column;
+    max-height: min(92vh, 92dvh);
+    padding: clamp(1rem, 2.2vh, 1.6rem) clamp(1.1rem, 2.5vw, 1.8rem) !important;
+    overflow: hidden; /* 外枠は固定し、内部の .stats-modal-body でホイールスクロールさせる */
+}
+
+.stats-modal-header {
+    flex-shrink: 0;
+    padding-bottom: 0.75rem;
+    border-bottom: 1px solid var(--card-border);
+    margin-bottom: 0.9rem;
+}
+
+.stats-modal-header h2 {
+    margin-bottom: 0;
+    font-size: 1.3rem;
+}
+
+.stats-modal-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding-right: 0.35rem;
+}
+
 .stats-dashboard-grid {
     display: grid;
-    grid-template-columns: 1.2fr 1fr;
-    gap: 1.5rem;
+    grid-template-columns: 1.15fr 1fr;
+    gap: 1.25rem;
     align-items: start;
 }
 
 .stats-left-col {
     display: flex;
     flex-direction: column;
-    gap: 1.2rem;
+    gap: 0.95rem;
 }
 
 .stats-right-col {
@@ -619,7 +672,7 @@ select:focus, input:focus {
 }
 
 .stats-right-col .category-stats-list {
-    max-height: 380px; /* 大画面では少し縦長にスクロールできるよう拡張 */
+    max-height: clamp(175px, 28vh, 275px);
 }
 
 /* --- TTS Speed Control Slider Styling --- */
@@ -666,17 +719,17 @@ select:focus, input:focus {
 .weekly-chart-container {
     background: rgba(0, 0, 0, 0.2);
     border-radius: 0.5rem;
-    padding: 1.5rem 1rem 1rem 1rem;
+    padding: 0.9rem 0.9rem 0.75rem 0.9rem;
     border: 1px solid var(--card-border);
 }
 
 .weekly-chart {
     display: flex;
-    height: 180px;
-    gap: 1rem;
+    height: clamp(115px, 17vh, 160px);
+    gap: 0.75rem;
     align-items: flex-end;
     position: relative;
-    padding-top: 1.5rem;
+    padding-top: 1.2rem;
 }
 
 .chart-bars {
@@ -921,9 +974,9 @@ select:focus, input:focus {
     }
     
     .stats-modal-content {
-        padding: 1.2rem !important;
-        max-height: 95vh;
-        overflow-y: auto;
+        padding: 1.1rem !important;
+        max-height: 94dvh;
+        overflow: hidden;
     }
 
     .tts-speed-control {
@@ -1736,14 +1789,16 @@ select:focus, input:focus {
     gap: 0.5rem;
 }
 
-.bookmark-card-badges {
+.bookmark-card-badges,
+.bookmark-meta-badges {
     display: flex;
     flex-wrap: wrap;
     gap: 0.4rem;
     align-items: center;
 }
 
-.bm-badge {
+.bm-badge,
+.bookmark-exam-badge {
     font-size: 0.75rem;
     font-weight: 600;
     padding: 0.18rem 0.55rem;
@@ -1752,18 +1807,25 @@ select:focus, input:focus {
     color: #c7d2fe;
 }
 
-.bm-badge-chat {
+.bm-badge-chat,
+.bookmark-chat-badge {
+    font-size: 0.75rem;
+    font-weight: 600;
+    padding: 0.18rem 0.55rem;
+    border-radius: 6px;
     background: rgba(16, 185, 129, 0.2);
     color: #6ee7b7;
     border: 1px solid rgba(16, 185, 129, 0.4);
 }
 
-.bm-date {
+.bm-date,
+.bookmark-date {
     font-size: 0.75rem;
     color: var(--text-secondary);
 }
 
-.bookmark-card-question {
+.bookmark-card-question,
+.bookmark-question-preview {
     font-size: 0.93rem;
     color: var(--text-primary);
     line-height: 1.55;
@@ -1776,11 +1838,13 @@ select:focus, input:focus {
 .bookmark-card-actions {
     display: flex;
     justify-content: flex-end;
+    flex-wrap: wrap;
     gap: 0.55rem;
     margin-top: 0.2rem;
 }
 
-.bm-action-btn {
+.bm-action-btn,
+.bookmark-action-btn {
     padding: 0.4rem 0.85rem;
     border-radius: 6px;
     font-size: 0.82rem;
@@ -1793,41 +1857,128 @@ select:focus, input:focus {
     font-family: inherit;
 }
 
-.bm-action-btn.primary {
+.bm-action-btn.primary,
+.bookmark-action-btn.primary-action {
     background: rgba(99, 102, 241, 0.25);
     border-color: rgba(99, 102, 241, 0.55);
     color: #e0e7ff;
 }
 
-.bm-action-btn.primary:hover {
+.bm-action-btn.primary:hover,
+.bookmark-action-btn.primary-action:hover {
     background: var(--primary-color);
     color: #ffffff;
 }
 
-.bm-action-btn.danger:hover {
+.bm-action-btn:hover,
+.bookmark-action-btn:hover {
+    background: rgba(255, 255, 255, 0.14);
+}
+
+.bm-action-btn.danger:hover,
+.bookmark-action-btn.delete-action:hover {
     background: rgba(239, 68, 68, 0.25);
     border-color: var(--error-color);
     color: #fca5a5;
 }
 
-/* --- Backup & Restore Section --- */
-.backup-restore-desc {
-    font-size: 0.84rem;
+.bookmark-empty {
+    text-align: center;
+    padding: 2rem 1rem;
     color: var(--text-secondary);
-    margin-top: 0.3rem;
-    line-height: 1.5;
+}
+
+/* --- Backup & Restore Section & v2.1.1 Stats Modal Compact Layout --- */
+.backup-restore-section {
+    margin-top: 1rem;
+    padding-top: 0.9rem;
+}
+
+.backup-restore-header h3 {
+    font-size: 0.96rem;
+}
+
+.backup-restore-desc {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    margin-top: 0.2rem;
+    line-height: 1.45;
 }
 
 .backup-restore-actions {
     display: flex;
-    gap: 0.8rem;
+    gap: 0.75rem;
+    margin-top: 0.65rem;
+}
+
+.backup-restore-actions .secondary-btn {
+    padding: 0.65rem 0.9rem;
+    font-size: 0.88rem;
+}
+
+.stats-modal-footer {
+    margin-top: 0.95rem;
+    padding-top: 0.9rem;
 }
 
 @media (max-width: 640px) {
+    .stats-overview {
+        grid-template-columns: 1fr 1fr;
+    }
+    .stats-overview .stat-box:last-child {
+        grid-column: span 2;
+    }
     .backup-restore-actions {
         flex-direction: column;
     }
 }
+
+/* v2.1.1: ノートPCやスケーリング環境（縦幅820px以下）での一画面収まり＆スクロール最適化 */
+@media (max-height: 820px) {
+    .stats-modal-content {
+        max-height: calc(100dvh - 1.2rem);
+        padding: 0.95rem 1.35rem !important;
+    }
+    .stats-modal-header {
+        padding-bottom: 0.55rem;
+        margin-bottom: 0.65rem;
+    }
+    .stats-modal-header h2 {
+        font-size: 1.15rem;
+    }
+    .stat-box {
+        padding: 0.6rem 0.5rem;
+    }
+    .stat-value {
+        font-size: 1.3rem;
+    }
+    .stat-value.stat-value-time {
+        font-size: 1.1rem;
+    }
+    .weekly-chart-container {
+        padding: 0.65rem 0.8rem 0.55rem 0.8rem;
+    }
+    .weekly-chart {
+        height: 105px;
+        padding-top: 1rem;
+    }
+    .stats-right-col .category-stats-list {
+        max-height: 185px;
+    }
+    .backup-restore-section {
+        margin-top: 0.75rem;
+        padding-top: 0.7rem;
+    }
+    .stats-modal-footer {
+        margin-top: 0.75rem;
+        padding-top: 0.7rem;
+    }
+    .danger-btn {
+        padding: 0.6rem 0.9rem;
+        font-size: 0.9rem;
+    }
+}
+
 
 
 

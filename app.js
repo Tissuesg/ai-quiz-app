@@ -82,13 +82,24 @@ const EXAM_DATA = {
     }
 };
 
-// Changelog Data (v1.00 - v2.10)
+// Changelog Data (v1.00 - v2.1.1)
 const CHANGELOG_DATA = [
+    {
+        version: "v2.1.1",
+        date: "2026/11/06",
+        tag: "最新・UI表示改善",
+        latest: true,
+        items: [
+            "📊 成績・統計ダッシュボード画面のディスプレイ解像度適応＆マウスホイールスクロール対応（ヘッダー固定＋内部スクロール構造化により、ノートPCや高倍率スケーリング環境でも下部ボタンが見切れずスムーズにスクロール・操作可能に改善）",
+            "実績サマリー（総出題数・総合正答率・本日の学習時間）の3カラム1行レイアウト化とグラフ高さの自動調整（clamp）により、標準ディスプレイで拡大縮小なしに一画面で全体を見渡せるよう最適化",
+            "全モーダルウィンドウのキーボード（Escキー）閉じる操作およびスクロール位置自動リセットに対応"
+        ]
+    },
     {
         version: "v2.10",
         date: "2026/11/05",
-        tag: "最新・学習ノート強化",
-        latest: true,
+        tag: "学習ノート強化",
+        latest: false,
         items: [
             "⭐ ブックマーク（良問・解説ストック）機能を搭載（正解・不正解を問わず良問や重要解説をワンタップ保存、資格別フィルタ・解説即時閲覧・ブックマーク演習に対応）",
             "💬 AI専門講師チャットの自動記録＆復元機能（質問・回答履歴を問題データと紐づけて自動保存し、ブックマークや復習モードでいつでも再確認可能）",
@@ -360,9 +371,22 @@ function init() {
     statsBtn.addEventListener('click', () => {
         renderStats();
         statsModal.classList.remove('hidden');
+        const statsBody = statsModal.querySelector('.stats-modal-body');
+        if (statsBody) statsBody.scrollTop = 0;
     });
 
     document.getElementById('closeStatsBtn').addEventListener('click', () => statsModal.classList.add('hidden'));
+
+    // Escキーで開いているモーダルを閉じる
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+            [statsModal, bookmarkModal, changelogModal, apiModal].forEach(m => {
+                if (m && !m.classList.contains('hidden')) {
+                    m.classList.add('hidden');
+                }
+            });
+        }
+    });
 
     // Bookmark Modal & Action Listeners
     if (bookmarksHeaderBtn) {
