@@ -753,6 +753,9 @@ select:focus, input:focus {
     #nextBtn,
     .tutor-quick-chips,
     .tutor-input-row,
+    .tutor-export-toolbar,
+    .tutor-bubble-actions,
+    .self-grade-action,
     .icon-btn,
     .modal,
     .toast,
@@ -840,6 +843,69 @@ select:focus, input:focus {
         background: #fef7e0 !important;
         color: #b06000 !important;
         border-color: #b06000 !important;
+    }
+    /* v2.10: PDF保存・印刷時にAI講師チャット履歴と図表が見切れないように全展開 */
+    #aiTutorSection:not(.has-chat-history) {
+        display: none !important;
+    }
+    .ai-tutor-section {
+        background: #ffffff !important;
+        border: 1px solid #ccc !important;
+        color: black !important;
+        box-shadow: none !important;
+        margin-top: 1.5rem !important;
+        padding: 1.2rem !important;
+        page-break-inside: auto !important;
+    }
+    .ai-tutor-title {
+        color: #222 !important;
+    }
+    .tutor-chat-history {
+        max-height: none !important;
+        overflow: visible !important;
+        display: block !important;
+        padding: 0 !important;
+        margin: 0 !important;
+    }
+    .tutor-msg {
+        background: #f8f9fa !important;
+        border: 1px solid #ccc !important;
+        color: black !important;
+        max-width: 100% !important;
+        width: 100% !important;
+        margin-bottom: 0.9rem !important;
+        page-break-inside: auto !important;
+    }
+    .tutor-msg-user {
+        background: #eef2ff !important;
+        border-color: #818cf8 !important;
+    }
+    .tutor-msg-role {
+        color: #333 !important;
+    }
+    .exp-section-title,
+    .exp-option-num,
+    .exp-option-reason {
+        color: black !important;
+    }
+    .question-markdown table,
+    .tutor-msg-ai table {
+        background: white !important;
+        border: 1px solid #666 !important;
+        color: black !important;
+        page-break-inside: avoid !important;
+    }
+    .question-markdown th,
+    .question-markdown td,
+    .tutor-msg-ai th,
+    .tutor-msg-ai td {
+        border: 1px solid #888 !important;
+        color: black !important;
+    }
+    .question-markdown th,
+    .tutor-msg-ai th {
+        background: #e2e8f0 !important;
+        font-weight: bold !important;
     }
 }
 
@@ -1550,6 +1616,219 @@ select:focus, input:focus {
 .exp-option-reason p:last-child {
     margin-bottom: 0;
 }
+
+/* ==========================================================================
+   v2.10 Extensions: AI Tutor Chat Recording/Export, Bookmarks & Data Backup
+   ========================================================================== */
+
+.tutor-export-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.45rem;
+}
+
+.tutor-tool-btn {
+    background: rgba(99, 102, 241, 0.16);
+    border: 1px solid rgba(99, 102, 241, 0.4);
+    color: #c7d2fe;
+    padding: 0.32rem 0.7rem;
+    border-radius: 6px;
+    font-size: 0.78rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-family: inherit;
+}
+
+.tutor-tool-btn:hover {
+    background: rgba(99, 102, 241, 0.35);
+    border-color: #818cf8;
+    color: #ffffff;
+    transform: translateY(-1px);
+}
+
+.tutor-msg-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.35rem;
+}
+
+.tutor-msg-header .tutor-msg-role {
+    margin-bottom: 0;
+}
+
+.tutor-bubble-actions {
+    display: flex;
+    gap: 0.35rem;
+}
+
+.tutor-mini-btn {
+    background: rgba(255, 255, 255, 0.07);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    color: #cbd5e1;
+    padding: 0.18rem 0.5rem;
+    border-radius: 5px;
+    font-size: 0.72rem;
+    cursor: pointer;
+    transition: all 0.18s;
+    font-family: inherit;
+}
+
+.tutor-mini-btn:hover {
+    background: rgba(99, 102, 241, 0.3);
+    border-color: var(--primary-color);
+    color: #ffffff;
+}
+
+/* --- Bookmark Toggle Button --- */
+.bookmark-toggle-btn.is-bookmarked {
+    background: rgba(245, 158, 11, 0.2) !important;
+    border-color: #f59e0b !important;
+    color: #fde68a !important;
+    box-shadow: 0 0 12px rgba(245, 158, 11, 0.2);
+}
+
+/* --- Bookmark Modal Styles --- */
+.bookmark-modal-content {
+    max-height: 88vh;
+    display: flex;
+    flex-direction: column;
+}
+
+.bookmark-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    align-items: center;
+}
+
+.bookmark-list-container {
+    display: flex;
+    flex-direction: column;
+    gap: 0.85rem;
+    max-height: 55vh;
+    overflow-y: auto;
+    padding-right: 0.4rem;
+}
+
+.bookmark-card {
+    background: rgba(15, 23, 42, 0.65);
+    border: 1px solid var(--card-border);
+    border-radius: 10px;
+    padding: 1rem 1.15rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+    transition: border-color 0.2s;
+}
+
+.bookmark-card:hover {
+    border-color: rgba(99, 102, 241, 0.5);
+}
+
+.bookmark-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.bookmark-card-badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    align-items: center;
+}
+
+.bm-badge {
+    font-size: 0.75rem;
+    font-weight: 600;
+    padding: 0.18rem 0.55rem;
+    border-radius: 6px;
+    background: rgba(99, 102, 241, 0.22);
+    color: #c7d2fe;
+}
+
+.bm-badge-chat {
+    background: rgba(16, 185, 129, 0.2);
+    color: #6ee7b7;
+    border: 1px solid rgba(16, 185, 129, 0.4);
+}
+
+.bm-date {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+}
+
+.bookmark-card-question {
+    font-size: 0.93rem;
+    color: var(--text-primary);
+    line-height: 1.55;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.bookmark-card-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.55rem;
+    margin-top: 0.2rem;
+}
+
+.bm-action-btn {
+    padding: 0.4rem 0.85rem;
+    border-radius: 6px;
+    font-size: 0.82rem;
+    font-weight: 600;
+    cursor: pointer;
+    border: 1px solid var(--card-border);
+    background: rgba(255, 255, 255, 0.06);
+    color: var(--text-primary);
+    transition: all 0.2s;
+    font-family: inherit;
+}
+
+.bm-action-btn.primary {
+    background: rgba(99, 102, 241, 0.25);
+    border-color: rgba(99, 102, 241, 0.55);
+    color: #e0e7ff;
+}
+
+.bm-action-btn.primary:hover {
+    background: var(--primary-color);
+    color: #ffffff;
+}
+
+.bm-action-btn.danger:hover {
+    background: rgba(239, 68, 68, 0.25);
+    border-color: var(--error-color);
+    color: #fca5a5;
+}
+
+/* --- Backup & Restore Section --- */
+.backup-restore-desc {
+    font-size: 0.84rem;
+    color: var(--text-secondary);
+    margin-top: 0.3rem;
+    line-height: 1.5;
+}
+
+.backup-restore-actions {
+    display: flex;
+    gap: 0.8rem;
+}
+
+@media (max-width: 640px) {
+    .backup-restore-actions {
+        flex-direction: column;
+    }
+}
+
 
 
 

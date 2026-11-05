@@ -82,13 +82,26 @@ const EXAM_DATA = {
     }
 };
 
-// Changelog Data (v1.00 - v2.0.1)
+// Changelog Data (v1.00 - v2.10)
 const CHANGELOG_DATA = [
+    {
+        version: "v2.10",
+        date: "2026/11/05",
+        tag: "最新・学習ノート強化",
+        latest: true,
+        items: [
+            "⭐ ブックマーク（良問・解説ストック）機能を搭載（正解・不正解を問わず良問や重要解説をワンタップ保存、資格別フィルタ・解説即時閲覧・ブックマーク演習に対応）",
+            "💬 AI専門講師チャットの自動記録＆復元機能（質問・回答履歴を問題データと紐づけて自動保存し、ブックマークや復習モードでいつでも再確認可能）",
+            "📋 チャット文章・図表のワンクリック保存（各AI回答ごとの「コピー」「MD保存」ボタン、および問題・解説・全チャットを統合した「ノート全文コピー」「Markdown保存(.md)」を搭載）",
+            "🖨️ PDF保存・印刷時のAIチャット領域見切れを完全修正（スクロール枠を全展開し、問題・解説・AI講師質疑応答・図表を途切れず一括PDF化）",
+            "💾 学習データの外部バックアップ＆復元（JSONエクスポート／インポート）機能を搭載（GoogleドライブやiCloud等への外部保管・端末間移行に対応）"
+        ]
+    },
     {
         version: "v2.0.1",
         date: "2026/11/01",
-        tag: "最新・解説改善",
-        latest: true,
+        tag: "解説改善",
+        latest: false,
         items: [
             "解説文の各選択肢に【正】正しい選択肢（正しい記述）／【誤】誤った選択肢（誤りの記述）および【🎯本問の正解】のカラーバッジを自動付与し、一目で正誤が判別できるよう視認性を大幅向上",
             "Web検索連動（Google検索グラウンディング）利用時に解説文の正誤ラベルが省略されたり改行が空いたりする現象を、プロンプト改善とクライアント側自動構造化パーサーの二重対策で完全解消",
@@ -200,11 +213,13 @@ let currentQuiz = null;
 let currentExam = 'sme';
 let currentCategory = '';
 let isReviewMode = false;
+let isBookmarkMode = false;
 let stats = JSON.parse(localStorage.getItem('quagenius_stats')) || { total: 0, correct: 0, categories: {} };
 if (!stats.dailyHistory) {
     stats.dailyHistory = {};
 }
 let mistakes = JSON.parse(localStorage.getItem('quagenius_mistakes')) || [];
+let bookmarks = JSON.parse(localStorage.getItem('quagenius_bookmarks')) || [];
 let nextQuizPromise = null;
 
 // Learning Tracking, TTS & AI Tutor State
@@ -216,6 +231,7 @@ let isTutorLoading = false;
 // DOM Elements
 const settingsBtn = document.getElementById('settingsBtn');
 const statsBtn = document.getElementById('statsBtn');
+const bookmarksHeaderBtn = document.getElementById('bookmarksHeaderBtn');
 const apiModal = document.getElementById('apiModal');
 const statsModal = document.getElementById('statsModal');
 const versionBadge = document.getElementById('versionBadge');
@@ -223,6 +239,22 @@ const changelogModal = document.getElementById('changelogModal');
 const closeChangelogBtn = document.getElementById('closeChangelogBtn');
 const closeChangelogFooterBtn = document.getElementById('closeChangelogFooterBtn');
 const changelogList = document.getElementById('changelogList');
+
+// Bookmark Modal & Controls
+const bookmarkModal = document.getElementById('bookmarkModal');
+const closeBookmarkBtn = document.getElementById('closeBookmarkBtn');
+const closeBookmarkFooterBtn = document.getElementById('closeBookmarkFooterBtn');
+const bookmarkFilterExam = document.getElementById('bookmarkFilterExam');
+const startBookmarkPracticeBtn = document.getElementById('startBookmarkPracticeBtn');
+const bookmarkListContainer = document.getElementById('bookmarkListContainer');
+const bookmarkModeBtn = document.getElementById('bookmarkModeBtn');
+const bookmarkCountSpan = document.getElementById('bookmarkCount');
+const bookmarkToggleBtn = document.getElementById('bookmarkToggleBtn');
+
+// Backup & Restore Controls
+const exportDataBtn = document.getElementById('exportDataBtn');
+const importDataBtn = document.getElementById('importDataBtn');
+const importDataInput = document.getElementById('importDataInput');
 
 const engineRadios = document.getElementsByName('aiEngine');
 const geminiKeyGroup = document.getElementById('geminiKeyGroup');
@@ -282,6 +314,8 @@ const tutorChatHistory = document.getElementById('tutorChatHistory');
 const tutorInput = document.getElementById('tutorInput');
 const tutorSendBtn = document.getElementById('tutorSendBtn');
 const tutorChipBtns = document.querySelectorAll('.tutor-chip-btn');
+const copyTutorNoteBtn = document.getElementById('copyTutorNoteBtn');
+const downloadTutorMdBtn = document.getElementById('downloadTutorMdBtn');
 
 const nextBtn = document.getElementById('nextBtn');
 const nextBtnText = nextBtn.querySelector('.btn-text');
@@ -319,6 +353,7 @@ function init() {
     updateCategories();
     renderStats();
     updateReviewBtnState();
+    updateBookmarkBtnState();
 
     // Event Listeners
     settingsBtn.addEventListener('click', () => apiModal.classList.remove('hidden'));
@@ -328,6 +363,57 @@ function init() {
     });
 
     document.getElementById('closeStatsBtn').addEventListener('click', () => statsModal.classList.add('hidden'));
+
+    // Bookmark Modal & Action Listeners
+    if (bookmarksHeaderBtn) {
+        bookmarksHeaderBtn.addEventListener('click', openBookmarkModal);
+    }
+    if (bookmarkModeBtn) {
+        bookmarkModeBtn.addEventListener('click', openBookmarkModal);
+    }
+    if (closeBookmarkBtn) {
+        closeBookmarkBtn.addEventListener('click', () => bookmarkModal.classList.add('hidden'));
+    }
+    if (closeBookmarkFooterBtn) {
+        closeBookmarkFooterBtn.addEventListener('click', () => bookmarkModal.classList.add('hidden'));
+    }
+    if (bookmarkModal) {
+        bookmarkModal.addEventListener('click', (e) => {
+            if (e.target === bookmarkModal) bookmarkModal.classList.add('hidden');
+        });
+    }
+    if (bookmarkFilterExam) {
+        bookmarkFilterExam.addEventListener('change', renderBookmarkList);
+    }
+    if (startBookmarkPracticeBtn) {
+        startBookmarkPracticeBtn.addEventListener('click', startBookmarkPractice);
+    }
+    if (bookmarkToggleBtn) {
+        bookmarkToggleBtn.addEventListener('click', toggleCurrentQuizBookmark);
+    }
+
+    // Study Note Export Listeners (AI Tutor Toolbar)
+    if (copyTutorNoteBtn) {
+        copyTutorNoteBtn.addEventListener('click', copyStudyNoteToClipboard);
+    }
+    if (downloadTutorMdBtn) {
+        downloadTutorMdBtn.addEventListener('click', downloadStudyNoteMarkdown);
+    }
+
+    // Backup & Restore Listeners
+    if (exportDataBtn) {
+        exportDataBtn.addEventListener('click', exportAllData);
+    }
+    if (importDataBtn && importDataInput) {
+        importDataBtn.addEventListener('click', () => importDataInput.click());
+        importDataInput.addEventListener('change', (e) => {
+            const file = e.target.files && e.target.files[0];
+            if (file) {
+                importAllData(file);
+                importDataInput.value = '';
+            }
+        });
+    }
     
     // Changelog Modal Listeners
     if (versionBadge) {
@@ -388,14 +474,14 @@ function init() {
     }
 
     document.getElementById('resetStatsBtn').addEventListener('click', () => {
-        if(confirm('今までの統計データと「間違えた問題ストック」をすべてリセットしますか？')) {
-            stats = { total: 0, correct: 0, categories: {} };
+        if(confirm('今までの統計データと「間違えた問題ストック」をリセットしますか？\n（※保存済みのブックマークは保持されます）')) {
+            stats = { total: 0, correct: 0, categories: {}, dailyHistory: {} };
             mistakes = [];
             localStorage.setItem('quagenius_stats', JSON.stringify(stats));
             localStorage.setItem('quagenius_mistakes', JSON.stringify(mistakes));
             renderStats();
             updateReviewBtnState();
-            showToast('すべてのデータをリセットしました');
+            showToast('統計データと復習ストックをリセットしました');
         }
     });
 
@@ -425,6 +511,7 @@ function init() {
     generateBtn.addEventListener('click', async () => {
         stopSpeaking(); // 音声を停止
         isReviewMode = false;
+        isBookmarkMode = false;
         setLoading(true);
         quizSection.classList.add('hidden');
         resultSection.classList.add('hidden');
@@ -445,6 +532,7 @@ function init() {
         stopSpeaking(); // 音声を停止
         if (mistakes.length === 0) return;
         isReviewMode = true;
+        isBookmarkMode = false;
         quizSection.classList.add('hidden');
         resultSection.classList.add('hidden');
         
@@ -464,6 +552,10 @@ function init() {
         if (isReviewMode) {
             // 復習モード継続
             reviewBtn.click();
+            return;
+        }
+        if (isBookmarkMode) {
+            startBookmarkPractice();
             return;
         }
 
@@ -494,6 +586,10 @@ function init() {
         stopSpeaking(); // 音声を停止
         if (isReviewMode) {
             reviewBtn.click();
+            return;
+        }
+        if (isBookmarkMode) {
+            startBookmarkPractice();
             return;
         }
 
@@ -566,6 +662,16 @@ function updateReviewBtnState() {
     } else {
         reviewBtn.disabled = true;
     }
+}
+
+function updateBookmarkBtnState() {
+    if (bookmarkCountSpan) {
+        bookmarkCountSpan.textContent = bookmarks.length;
+    }
+    if (bookmarkModeBtn) {
+        bookmarkModeBtn.disabled = false; // 一覧モーダルを開けるよう常に有効化
+    }
+    updateBookmarkToggleUI();
 }
 
 function updateApiModalUI() {
@@ -1382,8 +1488,13 @@ function normalizeAnswer(str) {
 
 function displayQuiz(quiz) {
     stopSpeaking(); // 新しい問題が表示されたら読み上げを停止
+    ensureQuizId(quiz);
     currentQuiz = quiz;
-    resetTutorChat(); // 新しい問題に切り替わったらAI家庭教師チャット履歴をリセット
+    resetTutorChat(); // 新しい問題に切り替わったらAI家庭教師チャット履歴を初期化
+    if (Array.isArray(quiz.tutorHistory) && quiz.tutorHistory.length > 0) {
+        restoreTutorChat(quiz.tutorHistory);
+    }
+    updateBookmarkToggleUI();
 
     // 問題文をMarkdownとしてパースして表示（表組み・強調・改行を完全再現）
     questionText.innerHTML = marked.parse(quiz.question || '');
@@ -1401,7 +1512,11 @@ function displayQuiz(quiz) {
                       (quiz.exam === 'boki1' ? '簿記1級' :
                       (quiz.exam === 'itpass' ? 'ITパス' : 
                       (quiz.exam === 'takken' ? '宅建' : ''))))));
-    engineBadge.textContent = isReviewMode ? `復習: [${examLabel}] ${quiz.category}` : engineBadge.textContent;
+    if (isReviewMode) {
+        engineBadge.textContent = `復習: [${examLabel}] ${quiz.category}`;
+    } else if (isBookmarkMode) {
+        engineBadge.textContent = `⭐ ブックマーク: [${examLabel}] ${quiz.category}`;
+    }
 
     const isInputType = quiz.type === 'input' || (!quiz.options || quiz.options.length === 0);
 
@@ -1480,12 +1595,13 @@ function handleAnswer(selectedIndex, selectedBtn) {
 
     explanationText.innerHTML = formatExplanationHTML(currentQuiz.explanation, currentQuiz);
     renderGroundingInfo(currentQuiz);
+    updateBookmarkToggleUI();
     
     resultSection.classList.remove('hidden');
     resultSection.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 
-    // 先読み生成の開始 (復習モード以外の場合)
-    if (!isReviewMode) {
+    // 先読み生成の開始 (復習モード・ブックマーク演習モード以外の場合)
+    if (!isReviewMode && !isBookmarkMode) {
         nextQuizPromise = fetchQuizData().catch(e => {
             console.error("Background fetch failed:", e);
             throw e;
@@ -1545,11 +1661,12 @@ function handleInputAnswer() {
 
     explanationText.innerHTML = formatExplanationHTML(currentQuiz.explanation, currentQuiz);
     renderGroundingInfo(currentQuiz);
+    updateBookmarkToggleUI();
     resultSection.classList.remove('hidden');
     resultSection.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 
-    // 先読み生成の開始 (復習モード以外の場合)
-    if (!isReviewMode) {
+    // 先読み生成の開始 (復習モード・ブックマーク演習モード以外の場合)
+    if (!isReviewMode && !isBookmarkMode) {
         nextQuizPromise = fetchQuizData().catch(e => {
             console.error("Background fetch failed:", e);
             throw e;
@@ -1834,12 +1951,15 @@ function renderGroundingInfo(quiz) {
 }
 
 // ==========================================================================
-// v2.00: AI専門講師への深掘り質問（AI家庭教師チャット）機能
+// v2.00 / v2.10: AI専門講師への深掘り質問（AI家庭教師チャット＆記録・保存）機能
 // ==========================================================================
 
 function resetTutorChat() {
     currentTutorHistory = [];
     isTutorLoading = false;
+    if (aiTutorSection) {
+        aiTutorSection.classList.remove('has-chat-history');
+    }
     if (tutorChatHistory) {
         tutorChatHistory.innerHTML = '';
         tutorChatHistory.classList.add('hidden');
@@ -1857,6 +1977,72 @@ function resetTutorChat() {
     }
     if (tutorChipBtns) {
         tutorChipBtns.forEach(c => c.disabled = false);
+    }
+}
+
+function appendUserChatBubble(questionStr) {
+    if (!tutorChatHistory) return;
+    const userMsgEl = document.createElement('div');
+    userMsgEl.className = 'tutor-msg tutor-msg-user';
+    const roleSpan = document.createElement('span');
+    roleSpan.className = 'tutor-msg-role';
+    roleSpan.textContent = '🙋 あなたの質問';
+    const bodyDiv = document.createElement('div');
+    bodyDiv.textContent = questionStr;
+    userMsgEl.appendChild(roleSpan);
+    userMsgEl.appendChild(bodyDiv);
+    tutorChatHistory.appendChild(userMsgEl);
+}
+
+function renderTutorAiBubbleContent(aiMsgEl, questionStr, answerMarkdown) {
+    aiMsgEl.innerHTML = `
+        <div class="tutor-msg-header">
+            <span class="tutor-msg-role">🎓 AI専門講師</span>
+            <div class="tutor-bubble-actions">
+                <button type="button" class="tutor-mini-btn btn-copy-turn" title="この回答（図表・テキスト）をコピー">📋 コピー</button>
+                <button type="button" class="tutor-mini-btn btn-save-turn-md" title="この質疑応答をMarkdown(.md)で保存">💾 MD保存</button>
+            </div>
+        </div>
+        <div class="markdown-body question-markdown" style="margin-bottom:0; font-size:0.95rem;">${marked.parse(answerMarkdown || '')}</div>
+    `;
+    const copyBtn = aiMsgEl.querySelector('.btn-copy-turn');
+    const saveMdBtn = aiMsgEl.querySelector('.btn-save-turn-md');
+    if (copyBtn) {
+        copyBtn.addEventListener('click', () => {
+            copyTextToClipboard(`【質問】\n${questionStr}\n\n【AI専門講師の回答】\n${answerMarkdown}`, 'AI講師の回答をクリップボードにコピーしました');
+        });
+    }
+    if (saveMdBtn) {
+        saveMdBtn.addEventListener('click', () => {
+            const examName = (currentQuiz && EXAM_DATA[currentQuiz.exam] && EXAM_DATA[currentQuiz.exam].name) || '資格試験';
+            const catName = (currentQuiz && currentQuiz.category) || '';
+            const md = `# 🎓 AI専門講師 質疑応答メモ (${examName} - ${catName})\n\n## 🙋 質問\n${questionStr}\n\n## 💡 AI専門講師の回答\n${answerMarkdown}\n`;
+            downloadMarkdownFile(md, `QuaGenius_AI講師回答_${getTodayString()}.md`);
+            showToast('AI講師の回答をMarkdown(.md)で保存しました');
+        });
+    }
+}
+
+function restoreTutorChat(savedHistory) {
+    if (!Array.isArray(savedHistory) || savedHistory.length === 0 || !tutorChatHistory) return;
+    currentTutorHistory = savedHistory.map(h => ({ role: h.role, content: h.content }));
+    tutorChatHistory.innerHTML = '';
+    tutorChatHistory.classList.remove('hidden');
+    if (aiTutorSection) {
+        aiTutorSection.classList.add('has-chat-history');
+    }
+
+    let lastUserQ = '';
+    for (const item of currentTutorHistory) {
+        if (item.role === 'user') {
+            lastUserQ = item.content;
+            appendUserChatBubble(item.content);
+        } else if (item.role === 'assistant') {
+            const aiMsgEl = document.createElement('div');
+            aiMsgEl.className = 'tutor-msg tutor-msg-ai';
+            renderTutorAiBubbleContent(aiMsgEl, lastUserQ, item.content);
+            tutorChatHistory.appendChild(aiMsgEl);
+        }
     }
 }
 
@@ -1881,18 +2067,12 @@ async function handleTutorQuestion(questionStr) {
     if (tutorInput) tutorInput.value = '';
     setTutorLoadingState(true);
     tutorChatHistory.classList.remove('hidden');
+    if (aiTutorSection) {
+        aiTutorSection.classList.add('has-chat-history');
+    }
 
     // ユーザーの質問バブルを追加
-    const userMsgEl = document.createElement('div');
-    userMsgEl.className = 'tutor-msg tutor-msg-user';
-    const roleSpan = document.createElement('span');
-    roleSpan.className = 'tutor-msg-role';
-    roleSpan.textContent = '🙋 あなたの質問';
-    const bodyDiv = document.createElement('div');
-    bodyDiv.textContent = questionStr;
-    userMsgEl.appendChild(roleSpan);
-    userMsgEl.appendChild(bodyDiv);
-    tutorChatHistory.appendChild(userMsgEl);
+    appendUserChatBubble(questionStr);
 
     // AIのローディングバブルを追加
     const aiMsgEl = document.createElement('div');
@@ -1906,7 +2086,11 @@ async function handleTutorQuestion(questionStr) {
         currentTutorHistory.push({ role: 'user', content: questionStr });
         currentTutorHistory.push({ role: 'assistant', content: answerMarkdown });
 
-        aiMsgEl.innerHTML = `<span class="tutor-msg-role">🎓 AI専門講師</span><div class="markdown-body question-markdown" style="margin-bottom:0; font-size:0.95rem;">${marked.parse(answerMarkdown)}</div>`;
+        // 現在の問題オブジェクトにチャット履歴を記録＆保存済みデータ（ブックマーク・復習ストック）へ即時同期
+        currentQuiz.tutorHistory = [...currentTutorHistory];
+        syncQuizToStorage(currentQuiz);
+
+        renderTutorAiBubbleContent(aiMsgEl, questionStr, answerMarkdown);
         tutorChatHistory.scrollTop = tutorChatHistory.scrollHeight;
     } catch (e) {
         console.error('[AI Tutor Error]', e);
@@ -1915,6 +2099,396 @@ async function handleTutorQuestion(questionStr) {
         setTutorLoadingState(false);
         if (tutorInput) tutorInput.focus();
     }
+}
+
+// ==========================================================================
+// v2.10: 学習ノート保存（全文コピー & Markdownファイル保存）機能
+// ==========================================================================
+
+function buildStudyNoteMarkdown(quiz) {
+    if (!quiz) return '';
+    const examName = (EXAM_DATA[quiz.exam] && EXAM_DATA[quiz.exam].name) || EXAM_DATA[currentExam].name;
+    const catName = quiz.category || currentCategory;
+    const dateStr = getTodayString();
+
+    let md = `# 📚 QuaGenius 学習ノート: ${examName}（${catName}）\n`;
+    md += `- 記録日: ${dateStr}\n\n`;
+    md += `## 📝 問題\n${quiz.question}\n\n`;
+
+    if (quiz.type === 'input') {
+        md += `## 🎯 模範解答\n**${quiz.answer}${quiz.unit || ''}**\n\n`;
+    } else if (Array.isArray(quiz.options)) {
+        md += `## 🔢 選択肢\n`;
+        quiz.options.forEach((opt, idx) => {
+            const isAns = idx === Number(quiz.correct_index);
+            md += `${idx + 1}. ${opt}${isAns ? ' **【🎯正解】**' : ''}\n`;
+        });
+        md += `\n**正解: 選択肢 ${Number(quiz.correct_index) + 1}**\n\n`;
+    }
+
+    md += `## 📖 解説\n${quiz.explanation || ''}\n`;
+
+    const history = (Array.isArray(currentTutorHistory) && currentTutorHistory.length > 0)
+        ? currentTutorHistory
+        : (Array.isArray(quiz.tutorHistory) ? quiz.tutorHistory : []);
+
+    if (history.length > 0) {
+        md += `\n---\n\n## 🎓 AI専門講師との深掘り質疑応答 (${Math.floor(history.length / 2)}件)\n\n`;
+        let qNum = 1;
+        for (const turn of history) {
+            if (turn.role === 'user') {
+                md += `### Q${qNum}. ${turn.content}\n\n`;
+            } else if (turn.role === 'assistant') {
+                md += `${turn.content}\n\n`;
+                qNum++;
+            }
+        }
+    }
+
+    return md;
+}
+
+async function copyTextToClipboard(text, successMsg) {
+    try {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            await navigator.clipboard.writeText(text);
+        } else {
+            const ta = document.createElement('textarea');
+            ta.value = text;
+            ta.style.position = 'fixed';
+            ta.style.opacity = '0';
+            document.body.appendChild(ta);
+            ta.select();
+            document.execCommand('copy');
+            document.body.removeChild(ta);
+        }
+        showToast(successMsg || 'クリップボードにコピーしました');
+    } catch (e) {
+        console.error('Clipboard copy failed:', e);
+        showToast('コピーに失敗しました');
+    }
+}
+
+function copyStudyNoteToClipboard() {
+    if (!currentQuiz) return;
+    const md = buildStudyNoteMarkdown(currentQuiz);
+    const hasChat = currentTutorHistory.length > 0;
+    copyTextToClipboard(md, hasChat ? '問題・解説・AIチャット全文をコピーしました！' : '問題・解説ノートをコピーしました！');
+}
+
+function downloadMarkdownFile(content, filename) {
+    const blob = new Blob([content], { type: 'text/markdown;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+}
+
+function downloadStudyNoteMarkdown() {
+    if (!currentQuiz) return;
+    const md = buildStudyNoteMarkdown(currentQuiz);
+    const examLabel = (EXAM_DATA[currentQuiz.exam] && EXAM_DATA[currentQuiz.exam].name) || '資格試験';
+    const safeExam = examLabel.replace(/[\\/:*?"<>|\s]/g, '');
+    downloadMarkdownFile(md, `QuaGenius_学習ノート_${safeExam}_${getTodayString()}.md`);
+    showToast('学習ノート(.md)をダウンロードしました');
+}
+
+// ==========================================================================
+// v2.10: ブックマーク（良問・解説・AIチャット記録）機能
+// ==========================================================================
+
+function ensureQuizId(quiz) {
+    if (!quiz) return;
+    if (!quiz.id) {
+        quiz.id = `qg_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    }
+}
+
+function isSameQuiz(a, b) {
+    if (!a || !b) return false;
+    if (a.id && b.id && a.id === b.id) return true;
+    return Boolean(a.question && b.question && a.question === b.question && a.exam === b.exam);
+}
+
+function isQuizBookmarked(quiz) {
+    if (!quiz) return false;
+    return bookmarks.some(b => isSameQuiz(b, quiz));
+}
+
+function syncQuizToStorage(quiz) {
+    if (!quiz) return;
+    let bmUpdated = false;
+    bookmarks = bookmarks.map(b => {
+        if (isSameQuiz(b, quiz)) {
+            bmUpdated = true;
+            return { ...b, tutorHistory: Array.isArray(quiz.tutorHistory) ? [...quiz.tutorHistory] : b.tutorHistory };
+        }
+        return b;
+    });
+    if (bmUpdated) {
+        localStorage.setItem('quagenius_bookmarks', JSON.stringify(bookmarks));
+    }
+
+    let mkUpdated = false;
+    mistakes = mistakes.map(m => {
+        if (isSameQuiz(m, quiz)) {
+            mkUpdated = true;
+            return { ...m, tutorHistory: Array.isArray(quiz.tutorHistory) ? [...quiz.tutorHistory] : m.tutorHistory };
+        }
+        return m;
+    });
+    if (mkUpdated) {
+        localStorage.setItem('quagenius_mistakes', JSON.stringify(mistakes));
+    }
+}
+
+function updateBookmarkToggleUI() {
+    if (!bookmarkToggleBtn) return;
+    const saved = isQuizBookmarked(currentQuiz);
+    bookmarkToggleBtn.classList.toggle('is-bookmarked', saved);
+    const span = bookmarkToggleBtn.querySelector('.btn-text');
+    if (span) {
+        span.textContent = saved ? '🌟 ブックマーク済み' : '⭐ ブックマーク保存';
+    }
+}
+
+function toggleCurrentQuizBookmark() {
+    if (!currentQuiz) return;
+    ensureQuizId(currentQuiz);
+
+    if (currentTutorHistory.length > 0) {
+        currentQuiz.tutorHistory = [...currentTutorHistory];
+    }
+
+    const existingIdx = bookmarks.findIndex(b => isSameQuiz(b, currentQuiz));
+    if (existingIdx >= 0) {
+        bookmarks.splice(existingIdx, 1);
+        localStorage.setItem('quagenius_bookmarks', JSON.stringify(bookmarks));
+        updateBookmarkBtnState();
+        showToast('ブックマークを解除しました');
+    } else {
+        const bookmarkEntry = {
+            ...currentQuiz,
+            tutorHistory: Array.isArray(currentQuiz.tutorHistory) ? [...currentQuiz.tutorHistory] : [],
+            savedAt: new Date().toISOString()
+        };
+        bookmarks.unshift(bookmarkEntry);
+        localStorage.setItem('quagenius_bookmarks', JSON.stringify(bookmarks));
+        updateBookmarkBtnState();
+        showToast('⭐ 問題・解説・チャット履歴をブックマークに保存しました');
+    }
+}
+
+function openBookmarkModal() {
+    if (!bookmarkModal) return;
+    renderBookmarkList();
+    bookmarkModal.classList.remove('hidden');
+}
+
+function renderBookmarkList() {
+    if (!bookmarkListContainer) return;
+    const filterVal = bookmarkFilterExam ? bookmarkFilterExam.value : 'all';
+    const filtered = filterVal === 'all'
+        ? bookmarks
+        : bookmarks.filter(b => b.exam === filterVal);
+
+    if (startBookmarkPracticeBtn) {
+        startBookmarkPracticeBtn.disabled = filtered.length === 0;
+    }
+
+    bookmarkListContainer.innerHTML = '';
+
+    if (filtered.length === 0) {
+        bookmarkListContainer.innerHTML = `
+            <div class="bookmark-empty">
+                <p style="font-size: 1.05rem; margin-bottom: 0.4rem;">⭐ 保存されたブックマークはまだありません</p>
+                <p style="font-size: 0.85rem;">問題の解答後に表示される「⭐ ブックマーク保存」ボタンを押すと、良問・解説・AI講師とのチャット履歴をここに永久保存できます。</p>
+            </div>
+        `;
+        return;
+    }
+
+    filtered.forEach((bm) => {
+        const examName = (EXAM_DATA[bm.exam] && EXAM_DATA[bm.exam].name) || bm.exam || '資格試験';
+        const chatTurns = Array.isArray(bm.tutorHistory) ? Math.floor(bm.tutorHistory.length / 2) : 0;
+        const savedDate = bm.savedAt ? bm.savedAt.slice(0, 10).replace(/-/g, '/') : '';
+        const plainQuestion = (bm.question || '').replace(/[#*|>`\-]/g, ' ').replace(/\s+/g, ' ').trim();
+
+        const card = document.createElement('div');
+        card.className = 'bookmark-card';
+        card.innerHTML = `
+            <div class="bookmark-card-header">
+                <div class="bookmark-meta-badges">
+                    <span class="bookmark-exam-badge">[${examName}] ${bm.category || ''}</span>
+                    ${chatTurns > 0 ? `<span class="bookmark-chat-badge">💬 AI講師チャット記録 (${chatTurns}件)</span>` : ''}
+                </div>
+                <span class="bookmark-date">${savedDate}</span>
+            </div>
+            <div class="bookmark-question-preview">${plainQuestion}</div>
+            <div class="bookmark-card-actions">
+                <button type="button" class="bookmark-action-btn primary-action btn-view-bm">📖 解説・チャットを見る</button>
+                <button type="button" class="bookmark-action-btn btn-solve-bm">✍️ 問題を解く</button>
+                <button type="button" class="bookmark-action-btn delete-action btn-delete-bm">🗑️ 削除</button>
+            </div>
+        `;
+
+        card.querySelector('.btn-view-bm').addEventListener('click', () => {
+            openBookmarkItemWithExplanation(bm);
+        });
+        card.querySelector('.btn-solve-bm').addEventListener('click', () => {
+            openBookmarkItemForPractice(bm);
+        });
+        card.querySelector('.btn-delete-bm').addEventListener('click', () => {
+            bookmarks = bookmarks.filter(item => !isSameQuiz(item, bm));
+            localStorage.setItem('quagenius_bookmarks', JSON.stringify(bookmarks));
+            updateBookmarkBtnState();
+            renderBookmarkList();
+            showToast('ブックマークから削除しました');
+        });
+
+        bookmarkListContainer.appendChild(card);
+    });
+}
+
+function openBookmarkItemForPractice(bm) {
+    if (!bm) return;
+    if (bookmarkModal) bookmarkModal.classList.add('hidden');
+    isReviewMode = false;
+    isBookmarkMode = true;
+    resultSection.classList.add('hidden');
+    displayQuiz(bm);
+    quizSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function openBookmarkItemWithExplanation(bm) {
+    if (!bm) return;
+    if (bookmarkModal) bookmarkModal.classList.add('hidden');
+    isReviewMode = false;
+    isBookmarkMode = true;
+    displayQuiz(bm);
+
+    // 選択肢や入力欄を解答済み状態にし、即座に解説＆保存済みAIチャット履歴を表示する
+    const isInputType = bm.type === 'input' || (!bm.options || bm.options.length === 0);
+    if (isInputType) {
+        if (answerInput) {
+            answerInput.value = bm.answer || '';
+            answerInput.disabled = true;
+        }
+        if (submitAnswerBtn) submitAnswerBtn.disabled = true;
+        const unitStr = bm.unit ? ` ${bm.unit}` : '';
+        if (userAnswerDisplay) {
+            userAnswerDisplay.textContent = `（ブックマーク閲覧）`;
+            userAnswerDisplay.style.color = 'var(--text-secondary)';
+        }
+        if (correctAnswerDisplay) {
+            correctAnswerDisplay.textContent = `${bm.answer || ''}${unitStr}`;
+        }
+        if (inputResultFeedback) inputResultFeedback.classList.remove('hidden');
+        if (overrideCorrectBtn) overrideCorrectBtn.classList.add('hidden');
+    } else {
+        const buttons = optionsContainer.querySelectorAll('.option-btn');
+        buttons.forEach((btn, idx) => {
+            btn.disabled = true;
+            if (idx === Number(bm.correct_index)) {
+                btn.classList.add('correct');
+            }
+        });
+        if (inputResultFeedback) inputResultFeedback.classList.add('hidden');
+    }
+
+    resultSection.className = 'glass-card result-section result-correct';
+    resultIcon.textContent = '🌟';
+    resultTitle.textContent = 'ブックマーク（問題・解説・チャット記録）';
+    explanationText.innerHTML = formatExplanationHTML(bm.explanation, bm);
+    renderGroundingInfo(bm);
+    updateBookmarkToggleUI();
+    resultSection.classList.remove('hidden');
+    resultSection.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+function startBookmarkPractice() {
+    const filterVal = bookmarkFilterExam ? bookmarkFilterExam.value : 'all';
+    const pool = filterVal === 'all'
+        ? bookmarks
+        : bookmarks.filter(b => b.exam === filterVal);
+
+    if (pool.length === 0) {
+        showToast('対象のブックマーク問題がありません');
+        return;
+    }
+    if (bookmarkModal) bookmarkModal.classList.add('hidden');
+    isReviewMode = false;
+    isBookmarkMode = true;
+    resultSection.classList.add('hidden');
+    const randomBm = pool[Math.floor(Math.random() * pool.length)];
+    displayQuiz(randomBm);
+}
+
+// ==========================================================================
+// v2.10: 学習データの外部バックアップ（JSONエクスポート＆インポート）機能
+// ==========================================================================
+
+function exportAllData() {
+    const backupPayload = {
+        app: 'QuaGenius',
+        version: '2.10',
+        exportedAt: new Date().toISOString(),
+        stats,
+        mistakes,
+        bookmarks
+    };
+    const jsonStr = JSON.stringify(backupPayload, null, 2);
+    const blob = new Blob([jsonStr], { type: 'application/json;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `quagenius_backup_${getTodayString()}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    showToast('💾 全学習データ（成績・復習・ブックマーク）を書き出しました');
+}
+
+function importAllData(file) {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        try {
+            const parsed = JSON.parse(e.target.result);
+            if (!parsed || (typeof parsed !== 'object') || (!parsed.stats && !parsed.mistakes && !parsed.bookmarks)) {
+                throw new Error('INVALID_BACKUP_FILE');
+            }
+            if (parsed.stats && typeof parsed.stats === 'object') {
+                stats = {
+                    total: Number(parsed.stats.total) || 0,
+                    correct: Number(parsed.stats.correct) || 0,
+                    categories: parsed.stats.categories || {},
+                    dailyHistory: parsed.stats.dailyHistory || {}
+                };
+                localStorage.setItem('quagenius_stats', JSON.stringify(stats));
+            }
+            if (Array.isArray(parsed.mistakes)) {
+                mistakes = parsed.mistakes;
+                localStorage.setItem('quagenius_mistakes', JSON.stringify(mistakes));
+            }
+            if (Array.isArray(parsed.bookmarks)) {
+                bookmarks = parsed.bookmarks;
+                localStorage.setItem('quagenius_bookmarks', JSON.stringify(bookmarks));
+            }
+            renderStats();
+            updateReviewBtnState();
+            updateBookmarkBtnState();
+            showToast(`✅ バックアップを復元しました（ブックマーク${bookmarks.length}件・復習${mistakes.length}件）`);
+        } catch (err) {
+            console.error('[Backup Import Error]', err);
+            showToast('⚠️ バックアップファイルの形式が正しくありません');
+        }
+    };
+    reader.readAsText(file);
 }
 
 async function fetchTutorAnswer(userQuestion) {
@@ -2142,12 +2716,14 @@ function updateStatsAndMistakes(isCorrect) {
 
     localStorage.setItem('quagenius_stats', JSON.stringify(stats));
 
-    // 2. 復習ストックの更新
+    // 2. 復習ストックの更新（ブックマーク自体は正解しても削除されない）
     if (!isCorrect && !isReviewMode) {
-        // 新規で間違えた場合はストックに追加
-        mistakes.push(currentQuiz);
-        localStorage.setItem('quagenius_mistakes', JSON.stringify(mistakes));
-        showToast('間違えた問題としてストックしました');
+        // 新規で間違えた場合はストックに追加（重複防止）
+        if (!mistakes.some(m => isSameQuiz(m, currentQuiz))) {
+            mistakes.push(currentQuiz);
+            localStorage.setItem('quagenius_mistakes', JSON.stringify(mistakes));
+            showToast('間違えた問題としてストックしました');
+        }
     } else if (isCorrect && isReviewMode) {
         // 復習モードで正解した場合はストックから削除（消化）
         if (currentQuiz.mistakeIndex !== undefined) {

@@ -17,10 +17,11 @@
     <div id="app">
         <header>
             <div class="logo">
-                <span class="icon">✨</span> <span class="logo-text">QuaGenius</span> <span class="version-badge clickable-badge" id="versionBadge" title="更新履歴 (Changelog) を見る">v2.0.1</span>
+                <span class="icon">✨</span> <span class="logo-text">QuaGenius</span> <span class="version-badge clickable-badge" id="versionBadge" title="更新履歴 (Changelog) を見る">v2.10</span>
             </div>
             <div class="header-actions">
-                <button id="statsBtn" class="icon-btn" title="成績・統計">📊</button>
+                <button id="bookmarksHeaderBtn" class="icon-btn" title="ブックマーク一覧（保存した良問・解説・チャット）">⭐</button>
+                <button id="statsBtn" class="icon-btn" title="成績・統計・データバックアップ">📊</button>
                 <button id="settingsBtn" class="icon-btn" title="API設定">⚙️</button>
             </div>
         </header>
@@ -78,8 +79,11 @@
                         <span class="btn-text">新規問題を生成</span>
                         <div class="spinner hidden"></div>
                     </button>
-                    <button id="reviewBtn" class="secondary-btn flex-1" disabled title="間違えた問題からランダムに出題します">
+                    <button id="reviewBtn" class="secondary-btn flex-1" disabled title="間違えた問題からランダムに出題します（正解すると消化されます）">
                         <span class="btn-text">📖 復習モード (<span id="mistakeCount">0</span>)</span>
+                    </button>
+                    <button id="bookmarkModeBtn" class="secondary-btn flex-1" disabled title="ブックマーク保存した良問・解説・AI講師チャット履歴の一覧を開きます">
+                        <span class="btn-text">⭐ ブックマーク (<span id="bookmarkCount">0</span>)</span>
                     </button>
                 </div>
             </div>
@@ -157,6 +161,10 @@
                     <button id="printBtn" class="secondary-btn" style="flex: 1; min-width: 150px; font-size: 0.9rem; padding: 0.6rem;">
                         <span class="btn-text">📄 PDFとして保存 / 印刷</span>
                     </button>
+
+                    <button id="bookmarkToggleBtn" class="secondary-btn bookmark-toggle-btn" style="flex: 1; min-width: 165px; font-size: 0.9rem; padding: 0.6rem;" title="この問題・解説・AI講師とのチャット記録をブックマークに保存します">
+                        <span class="btn-text">⭐ ブックマーク保存</span>
+                    </button>
                 </div>
                 
                 <div class="explanation-box">
@@ -169,14 +177,21 @@
                     </div>
                 </div>
 
-                <!-- v2.00: AI専門講師への深掘り質問（AI家庭教師チャット） -->
+                <!-- v2.00 / v2.10: AI専門講師への深掘り質問（AI家庭教師チャット＆記録・エクスポート） -->
                 <div id="aiTutorSection" class="ai-tutor-section mt-4">
                     <div class="ai-tutor-header">
                         <div class="ai-tutor-title">
                             <span class="tutor-icon">🎓</span>
                             <span>AI専門講師にこの問題を深掘り質問する</span>
                         </div>
-                        <span class="ai-tutor-subtitle">疑問点をその場で解消</span>
+                        <div class="tutor-export-toolbar">
+                            <button type="button" id="copyTutorNoteBtn" class="tutor-tool-btn" title="問題・解説・AI講師とのチャット全文（図表含む）をクリップボードにコピーします">
+                                📋 ノート全文コピー
+                            </button>
+                            <button type="button" id="downloadTutorMdBtn" class="tutor-tool-btn" title="問題・解説・AI講師とのチャット全文（Markdown表含む）を.mdファイルとして保存します">
+                                💾 Markdown保存 (.md)
+                            </button>
+                        </div>
                     </div>
 
                     <!-- ワンタップ質問チップ -->
@@ -312,8 +327,62 @@
 
             </div>
             
+            <!-- v2.10: データ保護・外部バックアップ書き出し＆復元（クラウドドライブ保存対応） -->
+            <div class="backup-restore-section mt-4 border-top pt-4">
+                <div class="backup-restore-header">
+                    <h3>☁️ 学習データの外部バックアップ・復元</h3>
+                    <p class="backup-restore-desc">ブラウザのキャッシュ削除や機種変更に備えて、成績・復習ストック・ブックマーク（AI講師チャット履歴含む）をJSONファイルとしてGoogleドライブやiCloud、端末内に保存・復元できます。</p>
+                </div>
+                <div class="backup-restore-actions mt-3">
+                    <button type="button" id="exportDataBtn" class="secondary-btn flex-1">
+                        💾 バックアップを保存 (.json)
+                    </button>
+                    <button type="button" id="importDataBtn" class="secondary-btn flex-1">
+                        📂 バックアップから復元
+                    </button>
+                    <input type="file" id="importDataInput" accept=".json,application/json" class="hidden">
+                </div>
+            </div>
+            
             <div class="modal-actions mt-4 border-top pt-4">
                 <button id="resetStatsBtn" class="danger-btn">データをリセット</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- v2.10: Bookmark Modal (良問・解説・AI講師チャット履歴コレクション) -->
+    <div id="bookmarkModal" class="modal hidden">
+        <div class="modal-content glass-card bookmark-modal-content" style="max-width: 820px; width: 100%;">
+            <div class="modal-header">
+                <h2>⭐ ブックマーク一覧（良問・解説・チャット記録）</h2>
+                <button id="closeBookmarkBtn" class="icon-btn">✖</button>
+            </div>
+            <p class="modal-desc mt-2" style="margin-bottom: 0.8rem;">正解・不正解を問わず保存した良問と解説、およびAI専門講師とのチャット記録をいつでも見返したり再演習できます（正解しても自動削除されません）。</p>
+
+            <div class="bookmark-toolbar">
+                <div class="custom-select" style="flex: 1; min-width: 180px;">
+                    <select id="bookmarkFilterExam">
+                        <option value="all">すべての資格試験</option>
+                        <option value="sme">中小企業診断士</option>
+                        <option value="fp1">FP1級</option>
+                        <option value="tax">税理士</option>
+                        <option value="boki2">日商簿記2級</option>
+                        <option value="boki1">日商簿記1級</option>
+                        <option value="itpass">ITパスポート</option>
+                        <option value="takken">宅地建物取引士</option>
+                    </select>
+                </div>
+                <button type="button" id="startBookmarkPracticeBtn" class="primary-btn" style="width: auto; padding: 0.7rem 1.2rem; font-size: 0.9rem;">
+                    🎲 ランダムに1問演習する
+                </button>
+            </div>
+
+            <div id="bookmarkListContainer" class="bookmark-list-container mt-3">
+                <!-- Populated dynamically by app.js -->
+            </div>
+
+            <div class="modal-actions mt-4 border-top pt-3">
+                <button id="closeBookmarkFooterBtn" class="secondary-btn" style="width: 100%;">閉じる</button>
             </div>
         </div>
     </div>
