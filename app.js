@@ -82,13 +82,24 @@ const EXAM_DATA = {
     }
 };
 
-// Changelog Data (v1.00 - v2.1.1)
+// Changelog Data (v1.00 - v2.1.2)
 const CHANGELOG_DATA = [
+    {
+        version: "v2.1.2",
+        date: "2026/11/06",
+        tag: "最新・API安定化＆取得マニュアル搭載",
+        latest: true,
+        items: [
+            "🔧 短時間のリクエスト集中時に「404エラー」が頻発する不具合を修正（1番目のモデルが429レート制限に達した際、提供終了の旧フォールバックモデルの404エラーで上書きされ自動リトライが止まっていた問題を解消）",
+            "⚡ 全AIエンジンの使用モデルリストを最新・安定稼働版へ更新し、レート制限(429)発生時のクールダウン待機および先読み通信の衝突防止ディレイを導入",
+            "📖 アプリ内に「無料APIキー取得＆『本当に無料か』確認マニュアル」（英語画面の読み方・Groq/Geminiの無料プラン確認手順・OpenRouterの404防止Privacy設定ガイド）を搭載（ヘッダーの📖ボタンまたは⚙️設定画面からいつでも閲覧可能）"
+        ]
+    },
     {
         version: "v2.1.1",
         date: "2026/11/06",
-        tag: "最新・UI表示改善",
-        latest: true,
+        tag: "UI表示改善",
+        latest: false,
         items: [
             "📊 成績・統計ダッシュボード画面のディスプレイ解像度適応＆マウスホイールスクロール対応（ヘッダー固定＋内部スクロール構造化により、ノートPCや高倍率スケーリング環境でも下部ボタンが見切れずスムーズにスクロール・操作可能に改善）",
             "実績サマリー（総出題数・総合正答率・本日の学習時間）の3カラム1行レイアウト化とグラフ高さの自動調整（clamp）により、標準ディスプレイで拡大縮小なしに一画面で全体を見渡せるよう最適化",
@@ -232,6 +243,7 @@ if (!stats.dailyHistory) {
 let mistakes = JSON.parse(localStorage.getItem('quagenius_mistakes')) || [];
 let bookmarks = JSON.parse(localStorage.getItem('quagenius_bookmarks')) || [];
 let nextQuizPromise = null;
+let prefetchTimer = null;
 
 // Learning Tracking, TTS & AI Tutor State
 let sessionSeconds = 0;
@@ -243,7 +255,13 @@ let isTutorLoading = false;
 const settingsBtn = document.getElementById('settingsBtn');
 const statsBtn = document.getElementById('statsBtn');
 const bookmarksHeaderBtn = document.getElementById('bookmarksHeaderBtn');
+const apiGuideHeaderBtn = document.getElementById('apiGuideHeaderBtn');
+const openApiGuideBtn = document.getElementById('openApiGuideBtn');
 const apiModal = document.getElementById('apiModal');
+const closeApiModalBtn = document.getElementById('closeApiModalBtn');
+const apiGuideModal = document.getElementById('apiGuideModal');
+const closeApiGuideBtn = document.getElementById('closeApiGuideBtn');
+const closeApiGuideFooterBtn = document.getElementById('closeApiGuideFooterBtn');
 const statsModal = document.getElementById('statsModal');
 const versionBadge = document.getElementById('versionBadge');
 const changelogModal = document.getElementById('changelogModal');
@@ -368,6 +386,34 @@ function init() {
 
     // Event Listeners
     settingsBtn.addEventListener('click', () => apiModal.classList.remove('hidden'));
+    if (closeApiModalBtn) {
+        closeApiModalBtn.addEventListener('click', () => apiModal.classList.add('hidden'));
+    }
+
+    const openApiGuide = () => {
+        if (!apiGuideModal) return;
+        apiGuideModal.classList.remove('hidden');
+        const guideBody = apiGuideModal.querySelector('.stats-modal-body');
+        if (guideBody) guideBody.scrollTop = 0;
+    };
+    if (apiGuideHeaderBtn) {
+        apiGuideHeaderBtn.addEventListener('click', openApiGuide);
+    }
+    if (openApiGuideBtn) {
+        openApiGuideBtn.addEventListener('click', openApiGuide);
+    }
+    if (closeApiGuideBtn) {
+        closeApiGuideBtn.addEventListener('click', () => apiGuideModal.classList.add('hidden'));
+    }
+    if (closeApiGuideFooterBtn) {
+        closeApiGuideFooterBtn.addEventListener('click', () => apiGuideModal.classList.add('hidden'));
+    }
+    if (apiGuideModal) {
+        apiGuideModal.addEventListener('click', (e) => {
+            if (e.target === apiGuideModal) apiGuideModal.classList.add('hidden');
+        });
+    }
+
     statsBtn.addEventListener('click', () => {
         renderStats();
         statsModal.classList.remove('hidden');
@@ -380,7 +426,7 @@ function init() {
     // Escキーで開いているモーダルを閉じる
     document.addEventListener('keydown', (e) => {
         if (e.key === 'Escape') {
-            [statsModal, bookmarkModal, changelogModal, apiModal].forEach(m => {
+            [apiGuideModal, statsModal, bookmarkModal, changelogModal, apiModal].forEach(m => {
                 if (m && !m.classList.contains('hidden')) {
                     m.classList.add('hidden');
                 }
@@ -512,28 +558,29 @@ function init() {
     saveApiBtn.addEventListener('click', saveApiSettings);
     examSelect.addEventListener('change', () => {
         updateCategories();
-        nextQuizPromise = null;
+        cancelBackgroundPrefetch();
     });
     categorySelect.addEventListener('change', () => {
-        nextQuizPromise = null;
+        cancelBackgroundPrefetch();
     });
     if (formatSelect) {
         formatSelect.addEventListener('change', () => {
-            nextQuizPromise = null;
+            cancelBackgroundPrefetch();
         });
     }
     calcOptionCheckbox.addEventListener('change', () => {
-        nextQuizPromise = null;
+        cancelBackgroundPrefetch();
     });
     if (searchGroundingCheckbox) {
         searchGroundingCheckbox.addEventListener('change', () => {
-            nextQuizPromise = null;
+            cancelBackgroundPrefetch();
         });
     }
     
     // 初回生成ボタン
     generateBtn.addEventListener('click', async () => {
         stopSpeaking(); // 音声を停止
+        cancelBackgroundPrefetch();
         isReviewMode = false;
         isBookmarkMode = false;
         setLoading(true);
@@ -554,6 +601,7 @@ function init() {
     // 復習モードボタン
     reviewBtn.addEventListener('click', () => {
         stopSpeaking(); // 音声を停止
+        cancelBackgroundPrefetch();
         if (mistakes.length === 0) return;
         isReviewMode = true;
         isBookmarkMode = false;
@@ -583,6 +631,10 @@ function init() {
             return;
         }
 
+        if (prefetchTimer) {
+            clearTimeout(prefetchTimer);
+            prefetchTimer = null;
+        }
         if (!nextQuizPromise) {
             nextQuizPromise = fetchQuizData();
         }
@@ -590,16 +642,14 @@ function init() {
         setNextBtnLoading(true);
         try {
             const data = await nextQuizPromise;
+            nextQuizPromise = null;
             resultSection.classList.add('hidden');
             quizSection.classList.add('hidden');
             displayQuiz(data);
         } catch (e) {
             console.error('[QuaGenius Next Error]', e);
             showToast(formatUserErrorMessage(e));
-            nextQuizPromise = fetchQuizData().catch(err => {
-                console.warn('Retry prefetch failed:', err);
-                throw err;
-            });
+            nextQuizPromise = null;
         } finally {
             setNextBtnLoading(false);
         }
@@ -608,6 +658,7 @@ function init() {
     // 「この問題をスキップ」ボタン
     skipBtn.addEventListener('click', async () => {
         stopSpeaking(); // 音声を停止
+        cancelBackgroundPrefetch();
         if (isReviewMode) {
             reviewBtn.click();
             return;
@@ -797,7 +848,30 @@ function setNextBtnLoading(isLoading) {
     }
 }
 
-async function fetchQuizData() {
+function cancelBackgroundPrefetch() {
+    if (prefetchTimer) {
+        clearTimeout(prefetchTimer);
+        prefetchTimer = null;
+    }
+    nextQuizPromise = null;
+}
+
+function scheduleBackgroundPrefetch() {
+    cancelBackgroundPrefetch();
+    // 解答直後のAI講師質問や連続操作とAPIリクエストが衝突して429レート制限になるのを防ぐため1.8秒遅延させる
+    prefetchTimer = setTimeout(() => {
+        prefetchTimer = null;
+        if (!isReviewMode && !isBookmarkMode) {
+            nextQuizPromise = fetchQuizData({ isPrefetch: true }).catch(e => {
+                console.warn('Background prefetch skipped/failed:', e.message);
+                nextQuizPromise = null;
+            });
+        }
+    }, 1800);
+}
+
+async function fetchQuizData(fetchOptions = {}) {
+    const { isPrefetch = false } = fetchOptions;
     const engine = localStorage.getItem('ai_engine') || 'gemini';
     const apiKey = localStorage.getItem(`${engine}_api_key`);
     
@@ -909,7 +983,9 @@ ${useSearchGrounding ? '・【Google検索グラウンディング連動】必�
 ${outputSchemaSection}`;
 
     // 自動リトライ用のラッパー関数（429レート制限、503サーバー過負荷、スリープ復帰直後のネットワーク切断、JSONパース崩れに対応）
-    const fetchWithRetry = async (fetcher, retries = 2, attempt = 1) => {
+    // バックグラウンド先読み(isPrefetch)時はAPI枠を浪費しないようリトライ回数を0〜1回に抑える
+    const initialRetries = isPrefetch ? 0 : 2;
+    const fetchWithRetry = async (fetcher, retries = initialRetries, attempt = 1) => {
         try {
             return await fetcher(prompt, apiKey, { useSearchGrounding, selectedFormat, isChoiceOnly });
         } catch (e) {
@@ -918,7 +994,7 @@ ${outputSchemaSection}`;
             const isRetryable = msg === 'RATE_LIMIT' || msg === 'SERVER_OVERLOAD' || msg === 'INVALID_QUIZ_FORMAT' || isNetworkErr;
 
             if (isRetryable && retries > 0) {
-                const waitMs = msg === 'RATE_LIMIT' ? 2500 * attempt : 1500 * attempt;
+                const waitMs = msg === 'RATE_LIMIT' ? 3000 * attempt : 1500 * attempt;
                 console.warn(`[QuaGenius Retry] Reason: ${msg || 'Network'}. Retrying in ${waitMs}ms... (${retries} retries left)`);
                 await new Promise(resolve => setTimeout(resolve, waitMs));
                 return await fetchWithRetry(fetcher, retries - 1, attempt + 1);
@@ -941,6 +1017,25 @@ ${outputSchemaSection}`;
     }
 }
 
+// フォールバック中に発生したエラーの優先度判定関数
+// （1番目のモデルで発生した429レート制限や503過負荷が、後続の予備モデルの404エラー等で上書きされて消えるのを防ぐ）
+function selectPriorityError(prevErr, nextErr) {
+    if (!prevErr) return nextErr;
+    if (!nextErr) return prevErr;
+
+    const getRank = (err) => {
+        const m = (err && err.message) ? err.message : '';
+        if (m === 'AUTH_ERROR') return 100;
+        if (m === 'OPENROUTER_PRIVACY_404') return 90;
+        if (m === 'RATE_LIMIT' || m.includes('429')) return 80;
+        if (m === 'SERVER_OVERLOAD' || m.includes('503') || m.includes('502')) return 70;
+        if (m === 'INVALID_QUIZ_FORMAT' || m.startsWith('OPENROUTER_PARSE_FAIL:')) return 60;
+        return 10; // 404等のモデル個別エラーは最も優先度を低くし、429等を上書きさせない
+    };
+
+    return getRank(nextErr) >= getRank(prevErr) ? nextErr : prevErr;
+}
+
 // ユーザー向けの分かりやすい日本語エラーメッセージ変換関数
 function formatUserErrorMessage(e) {
     const msg = (e && e.message) ? e.message : '';
@@ -950,8 +1045,11 @@ function formatUserErrorMessage(e) {
     if (msg === 'AUTH_ERROR' || msg.includes('401') || msg.includes('403') || msg.includes('API_KEY_INVALID')) {
         return 'APIキーが無効または権限がありません。右上の⚙️設定からAPIキーをご確認ください。';
     }
+    if (msg === 'OPENROUTER_PRIVACY_404') {
+        return 'OpenRouterの無料モデル利用設定(Privacy)がOFFのため404が返されました。右上の「📖」マニュアル内のリンクから「Enable free endpoints」をONにしてください。';
+    }
     if (msg === 'RATE_LIMIT' || msg.includes('429')) {
-        return 'APIの利用制限（短時間のリクエスト上限）に達しました。数秒待ってから再度お試しください。';
+        return '短時間のリクエスト集中により無料枠のスピード制限（1分あたりの上限）に達しました。10〜20秒ほど待ってから再度お試しください。';
     }
     if (msg === 'SERVER_OVERLOAD' || msg.includes('503') || msg.includes('502') || msg.includes('504')) {
         return 'AIサーバーが一時的に混雑しています。数秒待ってから再度お試しいただくか、別のAIエンジンをお試しください。';
@@ -961,6 +1059,9 @@ function formatUserErrorMessage(e) {
     }
     if (msg === 'INVALID_QUIZ_FORMAT' || msg.startsWith('OPENROUTER_PARSE_FAIL:') || msg.includes('JSON parsing failed')) {
         return 'AIが不正な形式のデータを返しました。もう一度ボタンを押して再生成してください。';
+    }
+    if (msg.includes('404')) {
+        return 'AIモデルが見つからない(404)か、短時間のリクエスト集中により一時制限されています。数秒待って再試行するか、右上の「📖」マニュアルをご確認ください。';
     }
     return `生成エラー: ${msg || '不明なエラーが発生しました'}`;
 }
@@ -1174,11 +1275,10 @@ function extractGeminiGrounding(candidate) {
 async function fetchGemini(prompt, apiKey, options = {}) {
     const { useSearchGrounding = false, selectedFormat = 'auto', isChoiceOnly = false } = options;
 
-    // Gemini マルチモデル・フォールバック（特定モデルの混雑・新規キー制限・世代移行に自動対応）
+    // Gemini マルチモデル・フォールバック（廃止された2.0系を除外し、現行稼働の2.5系2モデルで安定運用）
     const geminiModels = [
         'gemini-2.5-flash',
-        'gemini-2.5-flash-lite',
-        'gemini-2.0-flash'
+        'gemini-2.5-flash-lite'
     ];
 
     let lastError = null;
@@ -1241,15 +1341,17 @@ async function fetchGemini(prompt, apiKey, options = {}) {
                 if (response.status === 401) {
                     throw new Error('AUTH_ERROR');
                 }
-                // 404(モデル制限/廃止), 403(モデル単位のアクセス制限), 429(レート制限), 503(過負荷)は次のモデルへフォールバック
                 console.warn(`[Gemini] Model ${model} returned HTTP ${response.status}. Trying fallback...`);
+                let stepErr;
                 if (response.status === 429) {
-                    lastError = new Error('RATE_LIMIT');
+                    stepErr = new Error('RATE_LIMIT');
+                    await new Promise(r => setTimeout(r, 1200)); // 連続リクエスト緩和のクールダウン
                 } else if (response.status >= 500) {
-                    lastError = new Error('SERVER_OVERLOAD');
+                    stepErr = new Error('SERVER_OVERLOAD');
                 } else {
-                    lastError = new Error(`Gemini API Error: ${response.status}`);
+                    stepErr = new Error(`Gemini API Error: ${response.status}`);
                 }
+                lastError = selectPriorityError(lastError, stepErr);
                 continue;
             }
 
@@ -1264,7 +1366,7 @@ async function fetchGemini(prompt, apiKey, options = {}) {
             return quiz;
         } catch (e) {
             if (e.message === 'AUTH_ERROR') throw e;
-            lastError = e;
+            lastError = selectPriorityError(lastError, e);
             console.warn(`[Gemini] Model ${model} failed: ${e.message}`);
         }
     }
@@ -1273,10 +1375,10 @@ async function fetchGemini(prompt, apiKey, options = {}) {
 }
 
 async function fetchOpenAI(prompt, apiKey, options = {}) {
-    // OpenAI マルチモデル・フォールバック（最新のgpt-4.1-miniとgpt-4o-miniを順次試行）
+    // OpenAI マルチモデル・フォールバック（安定のgpt-4o-miniとgpt-4.1-miniを順次試行）
     const openaiModels = [
-        'gpt-4.1-mini',
-        'gpt-4o-mini'
+        'gpt-4o-mini',
+        'gpt-4.1-mini'
     ];
 
     let lastError = null;
@@ -1303,13 +1405,16 @@ async function fetchOpenAI(prompt, apiKey, options = {}) {
             if (!response.ok) {
                 if (response.status === 401) throw new Error('AUTH_ERROR');
                 console.warn(`[OpenAI] Model ${model} returned HTTP ${response.status}. Trying fallback...`);
+                let stepErr;
                 if (response.status === 429) {
-                    lastError = new Error('RATE_LIMIT');
+                    stepErr = new Error('RATE_LIMIT');
+                    await new Promise(r => setTimeout(r, 1200));
                 } else if (response.status >= 500) {
-                    lastError = new Error('SERVER_OVERLOAD');
+                    stepErr = new Error('SERVER_OVERLOAD');
                 } else {
-                    lastError = new Error(`OpenAI API Error: ${response.status}`);
+                    stepErr = new Error(`OpenAI API Error: ${response.status}`);
                 }
+                lastError = selectPriorityError(lastError, stepErr);
                 continue;
             }
 
@@ -1320,7 +1425,7 @@ async function fetchOpenAI(prompt, apiKey, options = {}) {
             return quiz;
         } catch (e) {
             if (e.message === 'AUTH_ERROR') throw e;
-            lastError = e;
+            lastError = selectPriorityError(lastError, e);
             console.warn(`[OpenAI] Model ${model} failed: ${e.message}`);
         }
     }
@@ -1329,10 +1434,9 @@ async function fetchOpenAI(prompt, apiKey, options = {}) {
 }
 
 async function fetchGroq(prompt, apiKey, options = {}) {
-    // Groq マルチモデル・フォールバック（Llama 3.3 70B -> Llama 4 Scout -> Llama 3.1 8B）
+    // Groq マルチモデル・フォールバック（長期安定稼働のProductionモデル2種を使用）
     const groqModels = [
         'llama-3.3-70b-versatile',
-        'meta-llama/llama-4-scout-17b-16e-instruct',
         'llama-3.1-8b-instant'
     ];
 
@@ -1360,13 +1464,16 @@ async function fetchGroq(prompt, apiKey, options = {}) {
             if (!response.ok) {
                 if (response.status === 401) throw new Error('AUTH_ERROR');
                 console.warn(`[Groq] Model ${model} returned HTTP ${response.status}. Trying fallback...`);
+                let stepErr;
                 if (response.status === 429) {
-                    lastError = new Error('RATE_LIMIT');
+                    stepErr = new Error('RATE_LIMIT');
+                    await new Promise(r => setTimeout(r, 1200));
                 } else if (response.status >= 500) {
-                    lastError = new Error('SERVER_OVERLOAD');
+                    stepErr = new Error('SERVER_OVERLOAD');
                 } else {
-                    lastError = new Error(`Groq API Error: ${response.status}`);
+                    stepErr = new Error(`Groq API Error: ${response.status}`);
                 }
+                lastError = selectPriorityError(lastError, stepErr);
                 continue;
             }
 
@@ -1377,7 +1484,7 @@ async function fetchGroq(prompt, apiKey, options = {}) {
             return quiz;
         } catch (e) {
             if (e.message === 'AUTH_ERROR') throw e;
-            lastError = e;
+            lastError = selectPriorityError(lastError, e);
             console.warn(`[Groq] Model ${model} failed: ${e.message}`);
         }
     }
@@ -1386,12 +1493,12 @@ async function fetchGroq(prompt, apiKey, options = {}) {
 }
 
 async function fetchOpenRouter(prompt, apiKey, options = {}) {
-    // OpenRouterの無料モデルリスト（公式自動ルーター openrouter/free を最優先に順次フォールバック）
+    // OpenRouterの無料モデルリスト（公式自動ルーター openrouter/free を最優先に現行の無料モデルへフォールバック）
     const freeModels = [
         'openrouter/free',
         'meta-llama/llama-3.3-70b-instruct:free',
-        'deepseek/deepseek-chat:free',
-        'qwen/qwen-2.5-72b-instruct:free',
+        'google/gemma-3-27b-it:free',
+        'deepseek/deepseek-r1:free'
     ];
 
     let lastError = null;
@@ -1426,15 +1533,18 @@ async function fetchOpenRouter(prompt, apiKey, options = {}) {
                 const errBody = await response.text().catch(() => '(no body)');
                 console.warn(`[OpenRouter] model ${model} HTTP error ${response.status}: ${errBody}`);
                 if (response.status === 401) throw new Error('AUTH_ERROR');
+                let stepErr;
                 if (response.status === 429) {
-                    lastError = new Error('RATE_LIMIT');
-                    continue;
+                    stepErr = new Error('RATE_LIMIT');
+                    await new Promise(r => setTimeout(r, 1200));
+                } else if (response.status === 404 && (errBody.includes('data policy') || errBody.includes('Privacy'))) {
+                    stepErr = new Error('OPENROUTER_PRIVACY_404');
+                } else if (response.status >= 500) {
+                    stepErr = new Error('SERVER_OVERLOAD');
+                } else {
+                    stepErr = new Error(`HTTP ${response.status}: ${errBody}`);
                 }
-                if (response.status >= 500) {
-                    lastError = new Error('SERVER_OVERLOAD');
-                    continue;
-                }
-                lastError = new Error(`HTTP ${response.status}: ${errBody}`);
+                lastError = selectPriorityError(lastError, stepErr);
                 continue;
             }
 
@@ -1443,14 +1553,24 @@ async function fetchOpenRouter(prompt, apiKey, options = {}) {
             // エラーオブジェクトが返ってきた場合
             if (data.error) {
                 console.warn(`[OpenRouter] API error object:`, data.error);
-                lastError = new Error(`API Error: ${data.error.message || JSON.stringify(data.error)}`);
+                const errCode = Number(data.error.code) || 0;
+                const errMsg = String(data.error.message || '');
+                let stepErr;
+                if (errCode === 429 || errMsg.includes('rate') || errMsg.includes('Rate limit')) {
+                    stepErr = new Error('RATE_LIMIT');
+                } else if (errCode === 404 && (errMsg.includes('data policy') || errMsg.includes('Privacy'))) {
+                    stepErr = new Error('OPENROUTER_PRIVACY_404');
+                } else {
+                    stepErr = new Error(`API Error: ${errMsg || JSON.stringify(data.error)}`);
+                }
+                lastError = selectPriorityError(lastError, stepErr);
                 continue;
             }
 
             const rawContent = data?.choices?.[0]?.message?.content;
             if (!rawContent || rawContent.trim() === '') {
                 console.warn(`[OpenRouter] model ${model} returned empty content`);
-                lastError = new Error('INVALID_QUIZ_FORMAT');
+                lastError = selectPriorityError(lastError, new Error('INVALID_QUIZ_FORMAT'));
                 continue;
             }
 
@@ -1462,13 +1582,13 @@ async function fetchOpenRouter(prompt, apiKey, options = {}) {
                 return quiz;
             } catch (parseErr) {
                 console.error(`[OpenRouter] JSON validation failed for ${model}. Raw content was:`, rawContent);
-                lastError = new Error(`OPENROUTER_PARSE_FAIL: model=${model}, raw=${rawContent.substring(0, 200)}`);
+                lastError = selectPriorityError(lastError, new Error(`OPENROUTER_PARSE_FAIL: model=${model}, raw=${rawContent.substring(0, 200)}`));
                 continue;
             }
 
         } catch (e) {
             if (e.message === 'AUTH_ERROR') throw e;
-            lastError = e;
+            lastError = selectPriorityError(lastError, e);
             console.warn(`[OpenRouter] model ${model} threw exception: ${e.message}`);
         }
     }
@@ -1624,12 +1744,9 @@ function handleAnswer(selectedIndex, selectedBtn) {
     resultSection.classList.remove('hidden');
     resultSection.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 
-    // 先読み生成の開始 (復習モード・ブックマーク演習モード以外の場合)
+    // 先読み生成の開始 (復習モード・ブックマーク演習モード以外の場合、1.8秒遅延でリクエスト集中を回避)
     if (!isReviewMode && !isBookmarkMode) {
-        nextQuizPromise = fetchQuizData().catch(e => {
-            console.error("Background fetch failed:", e);
-            throw e;
-        });
+        scheduleBackgroundPrefetch();
     }
 }
 
@@ -1689,12 +1806,9 @@ function handleInputAnswer() {
     resultSection.classList.remove('hidden');
     resultSection.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 
-    // 先読み生成の開始 (復習モード・ブックマーク演習モード以外の場合)
+    // 先読み生成の開始 (復習モード・ブックマーク演習モード以外の場合、1.8秒遅延でリクエスト集中を回避)
     if (!isReviewMode && !isBookmarkMode) {
-        nextQuizPromise = fetchQuizData().catch(e => {
-            console.error("Background fetch failed:", e);
-            throw e;
-        });
+        scheduleBackgroundPrefetch();
     }
 }
 
@@ -2553,7 +2667,7 @@ ${userQuestion}
 - JSONではなく、そのまま読めるMarkdownテキストとして出力してください。`;
 
     if (engine === 'gemini') {
-        const geminiModels = ['gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-2.0-flash'];
+        const geminiModels = ['gemini-2.5-flash', 'gemini-2.5-flash-lite'];
         let lastErr = null;
         for (const model of geminiModels) {
             try {
@@ -2579,7 +2693,8 @@ ${userQuestion}
                 }
                 if (!res.ok) {
                     if (res.status === 401) throw new Error('AUTH_ERROR');
-                    lastErr = new Error(res.status === 429 ? 'RATE_LIMIT' : 'SERVER_OVERLOAD');
+                    if (res.status === 429) await new Promise(r => setTimeout(r, 1200));
+                    lastErr = selectPriorityError(lastErr, new Error(res.status === 429 ? 'RATE_LIMIT' : 'SERVER_OVERLOAD'));
                     continue;
                 }
                 const data = await res.json();
@@ -2588,14 +2703,14 @@ ${userQuestion}
                 if (text) return text;
             } catch (e) {
                 if (e.message === 'AUTH_ERROR') throw e;
-                lastErr = e;
+                lastErr = selectPriorityError(lastErr, e);
             }
         }
         throw lastErr || new Error('SERVER_OVERLOAD');
     }
 
     if (engine === 'groq') {
-        const groqModels = ['llama-3.3-70b-versatile', 'meta-llama/llama-4-scout-17b-16e-instruct', 'llama-3.1-8b-instant'];
+        const groqModels = ['llama-3.3-70b-versatile', 'llama-3.1-8b-instant'];
         let lastErr = null;
         for (const model of groqModels) {
             try {
@@ -2610,7 +2725,8 @@ ${userQuestion}
                 });
                 if (!res.ok) {
                     if (res.status === 401) throw new Error('AUTH_ERROR');
-                    lastErr = new Error(res.status === 429 ? 'RATE_LIMIT' : 'SERVER_OVERLOAD');
+                    if (res.status === 429) await new Promise(r => setTimeout(r, 1200));
+                    lastErr = selectPriorityError(lastErr, new Error(res.status === 429 ? 'RATE_LIMIT' : 'SERVER_OVERLOAD'));
                     continue;
                 }
                 const data = await res.json();
@@ -2618,14 +2734,14 @@ ${userQuestion}
                 if (text) return text;
             } catch (e) {
                 if (e.message === 'AUTH_ERROR') throw e;
-                lastErr = e;
+                lastErr = selectPriorityError(lastErr, e);
             }
         }
         throw lastErr || new Error('SERVER_OVERLOAD');
     }
 
     if (engine === 'openrouter') {
-        const freeModels = ['openrouter/free', 'meta-llama/llama-3.3-70b-instruct:free', 'deepseek/deepseek-chat:free', 'qwen/qwen-2.5-72b-instruct:free'];
+        const freeModels = ['openrouter/free', 'meta-llama/llama-3.3-70b-instruct:free', 'google/gemma-3-27b-it:free', 'deepseek/deepseek-r1:free'];
         let lastErr = null;
         for (const model of freeModels) {
             try {
@@ -2644,8 +2760,14 @@ ${userQuestion}
                     })
                 });
                 if (!res.ok) {
+                    const errBody = await res.text().catch(() => '');
                     if (res.status === 401) throw new Error('AUTH_ERROR');
-                    lastErr = new Error(res.status === 429 ? 'RATE_LIMIT' : 'SERVER_OVERLOAD');
+                    if (res.status === 429) await new Promise(r => setTimeout(r, 1200));
+                    if (res.status === 404 && (errBody.includes('data policy') || errBody.includes('Privacy'))) {
+                        lastErr = selectPriorityError(lastErr, new Error('OPENROUTER_PRIVACY_404'));
+                        continue;
+                    }
+                    lastErr = selectPriorityError(lastErr, new Error(res.status === 429 ? 'RATE_LIMIT' : 'SERVER_OVERLOAD'));
                     continue;
                 }
                 const data = await res.json();
@@ -2653,14 +2775,14 @@ ${userQuestion}
                 if (text) return text;
             } catch (e) {
                 if (e.message === 'AUTH_ERROR') throw e;
-                lastErr = e;
+                lastErr = selectPriorityError(lastErr, e);
             }
         }
         throw lastErr || new Error('SERVER_OVERLOAD');
     }
 
     // OpenAI
-    const openaiModels = ['gpt-4.1-mini', 'gpt-4o-mini'];
+    const openaiModels = ['gpt-4o-mini', 'gpt-4.1-mini'];
     let lastErr = null;
     for (const model of openaiModels) {
         try {

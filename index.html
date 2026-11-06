@@ -17,11 +17,12 @@
     <div id="app">
         <header>
             <div class="logo">
-                <span class="icon">✨</span> <span class="logo-text">QuaGenius</span> <span class="version-badge clickable-badge" id="versionBadge" title="更新履歴 (Changelog) を見る">v2.1.1</span>
+                <span class="icon">✨</span> <span class="logo-text">QuaGenius</span> <span class="version-badge clickable-badge" id="versionBadge" title="更新履歴 (Changelog) を見る">v2.1.2</span>
             </div>
             <div class="header-actions">
                 <button id="bookmarksHeaderBtn" class="icon-btn" title="ブックマーク一覧（保存した良問・解説・チャット）">⭐</button>
                 <button id="statsBtn" class="icon-btn" title="成績・統計・データバックアップ">📊</button>
+                <button id="apiGuideHeaderBtn" class="icon-btn" title="無料APIキー取得＆完全無料確認マニュアル">📖</button>
                 <button id="settingsBtn" class="icon-btn" title="API設定">⚙️</button>
             </div>
         </header>
@@ -225,9 +226,16 @@
 
     <!-- API Key Modal -->
     <div id="apiModal" class="modal hidden">
-        <div class="modal-content glass-card">
-            <h2>初期設定・API選択</h2>
-            <p class="modal-desc">問題生成に使用するAIエンジンを選択し、APIキーを入力してください。キーはブラウザに安全に保存されます。</p>
+        <div class="modal-content glass-card" style="max-width: 560px;">
+            <div class="modal-header">
+                <h2 style="margin-bottom: 0;">⚙️ 初期設定・AIエンジン選択</h2>
+                <button id="closeApiModalBtn" class="icon-btn" title="閉じる (Esc)">✖</button>
+            </div>
+            <p class="modal-desc" style="margin-top: 0.5rem; margin-bottom: 0.9rem;">問題生成に使用するAIエンジンを選択し、APIキーを入力してください。キーは端末内のブラウザにのみ安全に保存されます。</p>
+
+            <button type="button" id="openApiGuideBtn" class="api-guide-banner-btn">
+                📖 英語画面でも安心！「無料APIキー取得＆完全無料チェックマニュアル」を開く
+            </button>
             
             <div class="engine-toggle" style="display: flex; flex-direction: column; gap: 0.6rem;">
                 <label class="radio-label">
@@ -236,44 +244,162 @@
                 </label>
                 <label class="radio-label">
                     <input type="radio" name="aiEngine" value="groq">
-                    <span>Groq [Llama 3.3 70B / Llama 4 Scout] (爆速・無料枠あり)</span>
+                    <span>Groq [Llama 3.3 70B / 3.1 8B] (爆速・無料枠あり)</span>
                 </label>
                 <label class="radio-label">
                     <input type="radio" name="aiEngine" value="openrouter">
-                    <span>OpenRouter [Auto Free Router] (無料枠あり)</span>
+                    <span>OpenRouter [Auto Free Router] (無料モデル専用・自動切替)</span>
                 </label>
                 <label class="radio-label">
                     <input type="radio" name="aiEngine" value="openai">
-                    <span>OpenAI [GPT-4.1-mini / GPT-4o-mini] (有料API)</span>
+                    <span>OpenAI [GPT-4o-mini / GPT-4.1-mini] (有料API)</span>
                 </label>
             </div>
 
             <div class="input-group mt-4" id="geminiKeyGroup">
-                <label for="geminiApiKeyInput">Google Gemini API Key</label>
+                <label for="geminiApiKeyInput">Google Gemini API Key <span class="free-safe-pill">✅ クレカ未登録なら完全無料</span></label>
                 <input type="password" id="geminiApiKeyInput" placeholder="AIzaSy...">
-                <a href="https://aistudio.google.com/app/apikey" target="_blank" class="link-btn text-small mt-2">APIキーを取得する (無料)</a>
+                <div class="api-helper-links mt-2">
+                    <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer" class="link-btn text-small">🔗 Google AI Studioでキーを取得 (無料)</a>
+                    <span class="api-helper-note">※Plan欄が「Free of charge (無料)」なら課金されません</span>
+                </div>
             </div>
 
             <div class="input-group mt-4 hidden" id="groqKeyGroup">
-                <label for="groqApiKeyInput">Groq API Key</label>
+                <label for="groqApiKeyInput">Groq API Key <span class="free-safe-pill">✅ Free Planは完全無料</span></label>
                 <input type="password" id="groqApiKeyInput" placeholder="gsk_...">
-                <a href="https://console.groq.com/keys" target="_blank" class="link-btn text-small mt-2">APIキーを取得する (無料)</a>
+                <div class="api-helper-links mt-2">
+                    <a href="https://console.groq.com/keys" target="_blank" rel="noopener noreferrer" class="link-btn text-small">🔗 Groq Consoleでキーを取得 (無料)</a>
+                    <span class="api-helper-note">※Settings &gt; Billing が「Free」かつカード未登録なら1円もかかりません</span>
+                </div>
             </div>
 
             <div class="input-group mt-4 hidden" id="openrouterKeyGroup">
-                <label for="openrouterApiKeyInput">OpenRouter API Key</label>
+                <label for="openrouterApiKeyInput">OpenRouter API Key <span class="free-safe-pill">✅ 無料モデル(:free)のみ使用</span></label>
                 <input type="password" id="openrouterApiKeyInput" placeholder="sk-or-v1-...">
-                <a href="https://openrouter.ai/keys" target="_blank" class="link-btn text-small mt-2">APIキーを取得する (無料)</a>
+                <div class="api-helper-links mt-2">
+                    <a href="https://openrouter.ai/keys" target="_blank" rel="noopener noreferrer" class="link-btn text-small">🔗 OpenRouterでキーを取得</a>
+                    <a href="https://openrouter.ai/settings/privacy" target="_blank" rel="noopener noreferrer" class="link-btn text-small" style="color: #fbbf24;">⚠️ 404防止: Privacy設定(Free endpoints)をONにする</a>
+                </div>
             </div>
 
             <div class="input-group mt-4 hidden" id="openaiKeyGroup">
-                <label for="openaiApiKeyInput">OpenAI API Key</label>
+                <label for="openaiApiKeyInput">OpenAI API Key <span class="paid-warn-pill">💳 要クレジット残高</span></label>
                 <input type="password" id="openaiApiKeyInput" placeholder="sk-proj-...">
-                <a href="https://platform.openai.com/api-keys" target="_blank" class="link-btn text-small mt-2">APIキーを取得する (要課金登録)</a>
+                <div class="api-helper-links mt-2">
+                    <a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener noreferrer" class="link-btn text-small">🔗 OpenAI Platformでキーを取得 (要課金登録)</a>
+                </div>
             </div>
             
             <div class="modal-actions mt-4">
                 <button id="saveApiBtn" class="primary-btn">保存して始める</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- v2.1.2: API Acquisition & Free-Tier Verification Guide Modal -->
+    <div id="apiGuideModal" class="modal hidden">
+        <div class="modal-content glass-card stats-modal-content" style="max-width: 820px; width: 100%;">
+            <div class="modal-header stats-modal-header">
+                <h2>📖 無料APIキー取得＆「本当に無料か」確認マニュアル</h2>
+                <button id="closeApiGuideBtn" class="icon-btn" title="閉じる (Esc)">✖</button>
+            </div>
+
+            <div class="stats-modal-body api-guide-body">
+                <!-- 1. 共通の安心ポイント -->
+                <div class="guide-alert-box">
+                    <div class="guide-alert-title">🛡️ 結論：クレジットカードを登録しない限り、勝手に課金されることは100%ありません</div>
+                    <p>Gemini・Groq・OpenRouterの3社はいずれも<strong>「クレジットカード登録なし」で無料APIキーを発行</strong>できます。万が一、短時間にたくさん問題を解いて無料枠の上限に達した場合でも、<strong>事後請求や自動課金に切り替わることはなく、単に「利用制限エラー（しばらく待ってから再試行）」になって止まるだけ</strong>ですのでご安心ください。</p>
+                </div>
+
+                <!-- 2. Google Gemini -->
+                <div class="guide-card">
+                    <div class="guide-card-header">
+                        <span class="guide-provider-badge badge-gemini">推奨 No.1</span>
+                        <h3>✨ Google Gemini API（無料枠が最も広く日本語も高精度）</h3>
+                    </div>
+                    <div class="guide-steps">
+                        <h4>【取得手順】</h4>
+                        <ol>
+                            <li><a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer" class="link-btn">Google AI Studio (API Keys)</a> にGoogleアカウントでログインします。</li>
+                            <li>右上の <strong><code>Create API key</code>（APIキーを作成）</strong> を押し、表示された <code>AIzaSy...</code> から始まる文字列をコピーして本アプリに貼り付けます。</li>
+                        </ol>
+                        <div class="guide-verify-box">
+                            <strong>🔍 本当に無料か確認するポイント（英語表記の見方）:</strong>
+                            <ul>
+                                <li>APIキー一覧画面の右端にある <strong><code>Plan</code>（プラン）列</strong> を見て、<strong><code>Free of charge</code>（または日本語で「無料」）</strong> と書かれていれば完全無料です。</li>
+                                <li><code>Set up Billing</code>（請求先の設定）という青いリンクが表示されている状態＝「まだ課金設定をしていない（＝無料枠で稼働中）」という意味です。</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 3. Groq -->
+                <div class="guide-card">
+                    <div class="guide-card-header">
+                        <span class="guide-provider-badge badge-groq">爆速・無料</span>
+                        <h3>⚡ Groq API（英語画面での取得＆無料プラン確認手順）</h3>
+                    </div>
+                    <div class="guide-steps">
+                        <h4>【取得手順（英語画面）】</h4>
+                        <ol>
+                            <li><a href="https://console.groq.com/keys" target="_blank" rel="noopener noreferrer" class="link-btn">Groq Cloud Console</a> を開き、Googleアカウント等でログイン（Sign in）します。</li>
+                            <li>左メニューの <strong><code>API Keys</code></strong> をクリックし、画面中央または右上の <strong><code>Create API Key</code></strong> ボタンを押します。</li>
+                            <li><code>Display Name for API Key</code> に適当な名前（例: <code>quiz</code>）を入力して <strong><code>Submit</code></strong> を押します。</li>
+                            <li><code>gsk_...</code> から始まるキーが表示されるので、<strong><code>Copy</code></strong> を押して本アプリに貼り付けます（※一度閉じると再表示できないため、その場でコピーしてください）。</li>
+                        </ol>
+                        <div class="guide-verify-box">
+                            <strong>🔍 本当に無料か確認するポイント（英語表記の見方）:</strong>
+                            <ul>
+                                <li>左メニュー下の <strong><code>Settings</code> &gt; <code>Billing</code>（請求）</strong> を開きます。</li>
+                                <li><strong><code>Current Plan: Free</code>（現在のプラン：無料）</strong> と表示されていれば、<strong>完全無料</strong>で利用できています！</li>
+                                <li>画面に <code>Upgrade to Developer Plan</code>（有料の開発者プランへアップグレード）というボタンが出ていれば、現在は無料のFreeプランにいる証拠です。カード番号を入力しない限り料金は一切発生しません。</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 4. OpenRouter -->
+                <div class="guide-card">
+                    <div class="guide-card-header">
+                        <span class="guide-provider-badge badge-openrouter">複数AI自動切替</span>
+                        <h3>🌐 OpenRouter API（無料確認＆「404エラー」を防ぐ必須設定）</h3>
+                    </div>
+                    <div class="guide-steps">
+                        <h4>【取得手順（英語画面）】</h4>
+                        <ol>
+                            <li><a href="https://openrouter.ai/keys" target="_blank" rel="noopener noreferrer" class="link-btn">OpenRouter Keys</a> にアクセスし、右上の <code>Sign in</code> からGoogleアカウント等でログインします。</li>
+                            <li><strong><code>Create Key</code></strong> ボタンを押し、<code>Name</code> に適当な名前（例: <code>quiz</code>）を入れます。</li>
+                            <li><code>Credit limit (optional)</code>（利用上限額）は<strong>空欄または <code>0</code></strong> のままで <strong><code>Create</code></strong> を押し、<code>sk-or-v1-...</code> のキーをコピーします。</li>
+                        </ol>
+                        <div class="guide-verify-box">
+                            <strong>🔍 本当に無料か確認するポイント ＆ ⚠️ 404エラー対策（重要）:</strong>
+                            <ul>
+                                <li><strong>無料の確認方法</strong>: 右上メニューの <code>Credits</code>（残高）が <strong><code>$0.00</code></strong> で、カード登録（<code>Add Credits</code>）をしていなければ絶対に課金されません。本アプリ（QuaGenius）はOpenRouterの<strong>無料専用モデル（<code>openrouter/free</code> や末尾 <code>:free</code>）しか呼び出さない安全設計</strong>になっています。</li>
+                                <li><strong>⚠️ OpenRouterで「404エラー」が出る場合の必須設定</strong>: OpenRouterで無料モデルを使うには、<a href="https://openrouter.ai/settings/privacy" target="_blank" rel="noopener noreferrer" class="link-btn">Settings &gt; Privacy（プライバシー設定）</a> を開き、<strong><code>Enable free endpoints that may train on inputs</code></strong>（および <code>may publish prompts</code>）のスイッチを <strong>ON（有効）</strong> にしてください。初期状態（OFF）のままだと、無料モデルへの通信がすべて <code>404 Not Found</code> として拒否されます。</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 5. 404エラーや短時間リクエスト集中時のFAQ -->
+                <div class="guide-card">
+                    <div class="guide-card-header">
+                        <span class="guide-provider-badge badge-faq">トラブル解決</span>
+                        <h3>💡 短時間に連続して問題を解くと「404」や制限エラーが出る理由</h3>
+                    </div>
+                    <div class="guide-steps">
+                        <ul>
+                            <li><strong>原因1（短時間のリクエスト集中によるレート制限）</strong>: 無料API枠には「1分間に〇回まで（RPM制限）」というスピード制限があります。連続で問題を生成・スキップしたりAI講師に質問したりすると一時的に制限（HTTP 429）にかかります。</li>
+                            <li><strong>原因2（旧バージョンのフォールバック上書きバグ → v2.1.2で修正済み！）</strong>: v2.1.1以前は、1番目のモデルが「429（スピード制限）」になった際、予備の旧モデル（提供終了で404を返すモデル）へ順番に切り替え、最後の「404エラー」でエラー表示を上書きしてしまう不具合がありました。</li>
+                            <li><strong>v2.1.2での改善</strong>: 廃止モデルを除去して現行モデルへ更新し、スピード制限（429）発生時は数秒のクールダウンを挟んで自動再試行するように改善しました。また、裏での「次の問題の先読み通信」も解答直後の通信とぶつからないよう間隔を空ける制御を導入しています。</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <div class="modal-actions stats-modal-footer border-top">
+                <button type="button" id="closeApiGuideFooterBtn" class="primary-btn" style="width: 100%;">理解しました（設定へ戻る）</button>
             </div>
         </div>
     </div>
