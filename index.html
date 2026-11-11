@@ -17,9 +17,10 @@
     <div id="app">
         <header>
             <div class="logo">
-                <span class="icon">✨</span> <span class="logo-text">QuaGenius</span> <span class="version-badge clickable-badge" id="versionBadge" title="更新履歴 (Changelog) を見る">v2.1.2</span>
+                <span class="icon">✨</span> <span class="logo-text">QuaGenius</span> <span class="version-badge clickable-badge" id="versionBadge" title="更新履歴 (Changelog) を見る">v2.20</span>
             </div>
             <div class="header-actions">
+                <button id="syllabusHeaderBtn" class="icon-btn" title="シラバス網羅マップ＆弱点傾向分析（学習の現在地）">🗺️</button>
                 <button id="bookmarksHeaderBtn" class="icon-btn" title="ブックマーク一覧（保存した良問・解説・チャット）">⭐</button>
                 <button id="statsBtn" class="icon-btn" title="成績・統計・データバックアップ">📊</button>
                 <button id="apiGuideHeaderBtn" class="icon-btn" title="無料APIキー取得＆完全無料確認マニュアル">📖</button>
@@ -45,11 +46,33 @@
                 </div>
 
                 <div class="control-group">
-                    <label for="categorySelect">出題分野</label>
+                    <label for="categorySelect">出題分野（大分類）</label>
                     <div class="custom-select">
                         <select id="categorySelect">
                             <!-- Dynamically populated -->
                         </select>
+                    </div>
+                </div>
+
+                <div class="control-group">
+                    <label for="subtopicSelect">出題論点（小分類・出題モード）</label>
+                    <div class="custom-select">
+                        <select id="subtopicSelect">
+                            <!-- Dynamically populated by app.js -->
+                        </select>
+                    </div>
+                </div>
+
+                <!-- v2.20: 学習の現在地（シラバス網羅ミニ進捗バー） -->
+                <div id="syllabusMiniBar" class="syllabus-mini-bar">
+                    <div class="syllabus-mini-top">
+                        <span id="syllabusMiniText" class="syllabus-mini-text">🗺️ 学習の現在地: 0 / 10 論点学習済 (0%)</span>
+                        <button type="button" id="openSyllabusMapBtn" class="syllabus-open-btn">
+                            🗺️ 網羅マップ＆弱点分析を開く
+                        </button>
+                    </div>
+                    <div id="syllabusMiniTiles" class="syllabus-mini-tiles" title="クリックで各論点の塗りつぶし状況を確認・出題できます">
+                        <!-- Dynamically populated tiles -->
                     </div>
                 </div>
 
@@ -91,7 +114,10 @@
 
             <!-- Quiz Display Area -->
             <div id="quizSection" class="glass-card quiz-section hidden">
-                <div class="badge" id="engineBadge">Gemini 2.5</div>
+                <div class="quiz-badges-row">
+                    <div class="badge" id="engineBadge">Gemini 2.5</div>
+                    <div class="badge subtopic-badge hidden" id="subtopicBadge">📌 論点</div>
+                </div>
                 <div id="questionText" class="markdown-body question-markdown">問題文がここに表示されます。</div>
                 
                 <!-- 4択選択肢コンテナ -->
@@ -113,9 +139,13 @@
                     </button>
                 </div>
 
-                <div class="skip-container" style="margin-top: 1.5rem; text-align: right;">
-                    <button id="skipBtn" class="secondary-btn" style="font-size: 0.9rem; padding: 0.5rem 1rem;">
-                        <span class="btn-text">⏭ この問題をスキップ</span>
+                <div class="skip-container">
+                    <button id="skipSameTopicBtn" class="secondary-btn skip-sub-btn" title="現在の小分類（論点）のまま、直前の問題とは異なる切り口・別パターンの問題を再生成します">
+                        <span class="btn-text">🔄 同じ論点で別問題に切替</span>
+                        <div class="spinner hidden"></div>
+                    </button>
+                    <button id="skipBtn" class="secondary-btn skip-main-btn" title="現在の小分類（論点）を除外し、必ず別の小分類（テーマ）から次の問題を出題します">
+                        <span class="btn-text">⏭️ 別テーマへスキップ（この論点を除外）</span>
                         <div class="spinner hidden"></div>
                     </button>
                 </div>
@@ -529,6 +559,100 @@
             </div>
             <div class="modal-actions mt-4 border-top pt-3">
                 <button id="closeChangelogFooterBtn" class="secondary-btn" style="width: 100%;">閉じる</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- v2.20: Syllabus Coverage Map & Weakness/Trend Analysis Modal -->
+    <div id="syllabusModal" class="modal hidden">
+        <div class="modal-content glass-card stats-modal-content" style="max-width: 960px; width: 100%;">
+            <div class="modal-header stats-modal-header">
+                <h2>🗺️ シラバス網羅マップ（学習の現在地）＆ 弱点・傾向分析</h2>
+                <button id="closeSyllabusBtn" class="icon-btn" title="閉じる (Esc)">✖</button>
+            </div>
+
+            <div class="stats-modal-body syllabus-modal-body">
+                <!-- 上部フィルタ＆全体網羅率サマリー -->
+                <div class="syllabus-filter-bar">
+                    <div class="custom-select" style="flex: 1; min-width: 190px;">
+                        <select id="syllabusExamSelect">
+                            <option value="sme">中小企業診断士</option>
+                            <option value="fp1">FP1級 (学科)</option>
+                            <option value="tax">税理士</option>
+                            <option value="boki2">日商簿記2級</option>
+                            <option value="boki1">日商簿記1級</option>
+                            <option value="itpass">ITパスポート</option>
+                            <option value="takken">宅地建物取引士</option>
+                        </select>
+                    </div>
+                    <div class="custom-select" style="flex: 1.2; min-width: 210px;">
+                        <select id="syllabusCategoryFilter">
+                            <option value="all">すべての出題分野を表示</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- 塗りつぶしステータス集計バー -->
+                <div class="syllabus-summary-card">
+                    <div class="syllabus-summary-header">
+                        <span id="syllabusOverallTitle" class="syllabus-overall-title">中小企業診断士 全体網羅率</span>
+                        <span id="syllabusOverallPercent" class="syllabus-overall-percent">0% (0 / 0 論点着手)</span>
+                    </div>
+                    <div class="progress-bar syllabus-progress-bar">
+                        <div id="syllabusMasteredBar" class="syllabus-bar-segment seg-mastered" style="width: 0%;"></div>
+                        <div id="syllabusLearningBar" class="syllabus-bar-segment seg-learning" style="width: 0%;"></div>
+                        <div id="syllabusWeakBar" class="syllabus-bar-segment seg-weak" style="width: 0%;"></div>
+                    </div>
+                    <div class="syllabus-legend">
+                        <span class="legend-item"><span class="legend-dot dot-mastered"></span>🟩 マスター済 (2問以上＆正答率80%↑): <strong id="countMastered">0</strong></span>
+                        <span class="legend-item"><span class="legend-dot dot-learning"></span>🟨 学習中 (着手済): <strong id="countLearning">0</strong></span>
+                        <span class="legend-item"><span class="legend-dot dot-weak"></span>🟥 要復習・弱点 (正答率50%未満/誤答超過): <strong id="countWeak">0</strong></span>
+                        <span class="legend-item"><span class="legend-dot dot-unstudied"></span>⬜ 未学習: <strong id="countUnstudied">0</strong></span>
+                    </div>
+                </div>
+
+                <!-- 🎯 正答・誤答の傾向分析＆特化すべき重点項目パネル -->
+                <div id="trendAnalysisPanel" class="trend-analysis-panel">
+                    <div class="trend-panel-header">
+                        <h3>🎯 正答・誤答の傾向分析 ＆ 特化すべき重点項目</h3>
+                        <span class="trend-panel-sub">解答履歴から自動診断（タイルやボタンを押すとその論点をピンポイント出題します）</span>
+                    </div>
+                    <div class="trend-grid">
+                        <!-- 左: 最優先で潰すべき弱点論点 Top 5 -->
+                        <div class="trend-card trend-card-weak">
+                            <h4>🔥 最優先で特化すべき弱点論点 Top 5</h4>
+                            <div id="weakSubtopicsList" class="trend-item-list">
+                                <!-- Populated by JS -->
+                            </div>
+                        </div>
+                        <!-- 右: 未着手の空白論点 ＆ 出題形式別傾向 -->
+                        <div class="trend-card trend-card-insight">
+                            <h4>📐 出題形式・問題タイプ別の正答傾向</h4>
+                            <div id="formatTendencySummary" class="format-tendency-box">
+                                <!-- Populated by JS -->
+                            </div>
+                            <h4 class="mt-3">🕳️ 優先して埋めるべき未学習論点（ピックアップ）</h4>
+                            <div id="unstudiedSubtopicsList" class="trend-item-list">
+                                <!-- Populated by JS -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 🗺️ 分野×小分類 塗りつぶしマップ本体 -->
+                <div class="syllabus-map-section">
+                    <div class="syllabus-map-section-header">
+                        <h3>🗺️ 出題分野 × 小分類（重要論点）塗りつぶしマップ</h3>
+                        <span class="syllabus-map-hint">💡 各論点タイルをクリックすると、その論点の問題を即座に生成して演習できます</span>
+                    </div>
+                    <div id="syllabusMapContainer" class="syllabus-map-container">
+                        <!-- Populated dynamically by app.js -->
+                    </div>
+                </div>
+            </div>
+
+            <div class="modal-actions stats-modal-footer border-top">
+                <button type="button" id="closeSyllabusFooterBtn" class="secondary-btn" style="width: 100%;">閉じる</button>
             </div>
         </div>
     </div>
