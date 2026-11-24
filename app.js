@@ -481,13 +481,24 @@ const SYLLABUS_DATA = {
     }
 };
 
-// Changelog Data (v1.00 - v2.2.1)
+// Changelog Data (v1.00 - v2.2.2)
 const CHANGELOG_DATA = [
+    {
+        version: "v2.2.2",
+        date: "2026/11/24",
+        tag: "最新・Gemini 4 Hydrogen 通信仕様最適化",
+        latest: true,
+        items: [
+            "🔧 Gemini 4 Hydrogen (gemini-4-hydrogen) で非対応の temperature パラメータ送信によるHTTP 400フォールバックを修正（通常モードで確実に Gemini 4 Hydrogen が稼働するよう最適化）",
+            "🧠 Gemini 4 の思考プロセス出力（thought: true パーツ）をレスポンス解析時に自動除外し、JSON解析やAI専門講師チャットの安定性を向上",
+            "🌐 「最新法改正・Web検索連動」ON時に無料枠で Gemini 4 Hydrogen の検索グラウンディングが非対応の場合、検索機能を落とさず Gemini 2.5 Flash (Web検索連動) へスムーズに自動切替するよう改善"
+        ]
+    },
     {
         version: "v2.2.1",
         date: "2026/11/24",
-        tag: "最新・Gemini 4 Hydrogen 無料枠対応",
-        latest: true,
+        tag: "Gemini 4 Hydrogen 無料枠対応",
+        latest: false,
         items: [
             "✨ Googleの最新世代モデル「Gemini 4 Hydrogen (gemini-4-hydrogen)」の無料API枠に最優先対応（既存のGemini APIキーのまま取り直し不要で利用可能）",
             "🛡️ 自動フォールバックを3段階構成（gemini-4-hydrogen → gemini-2.5-flash → gemini-2.5-flash-lite）へ強化し、法令・税務・計算問題の精度向上と無料枠の連続演習耐性を大幅に改善",
@@ -2101,24 +2112,33 @@ async function fetchGemini(prompt, apiKey, options = {}) {
 
     for (const model of geminiModels) {
         try {
+            const isGemini4 = model.startsWith('gemini-4');
+
             // Google検索グラウンディングON時は tools: [{ google_search: {} }] を付与
             // （※Gemini API仕様上、toolsとresponseMimeType: "application/json"の同時指定は400エラーになるため排他制御）
-            const requestBody = useSearchGrounding
-                ? {
+            // （※Gemini 4 Hydrogenはtemperature指定がHTTP 400エラーとなるため除外）
+            let requestBody;
+            if (useSearchGrounding) {
+                requestBody = {
                     contents: [{ parts: [{ text: prompt }] }],
-                    tools: [{ google_search: {} }],
-                    generationConfig: {
-                        temperature: 0.5
-                    }
-                }
-                : {
-                    contents: [{ parts: [{ text: prompt }] }],
-                    generationConfig: {
-                        temperature: 0.7,
-                        responseMimeType: "application/json",
-                        responseSchema: responseSchema
-                    }
+                    tools: [{ google_search: {} }]
                 };
+                if (!isGemini4) {
+                    requestBody.generationConfig = { temperature: 0.5 };
+                }
+            } else {
+                const genConfig = {
+                    responseMimeType: "application/json",
+                    responseSchema: responseSchema
+                };
+                if (!isGemini4) {
+                    genConfig.temperature = 0.7;
+                }
+                requestBody = {
+                    contents: [{ parts: [{ text: prompt }] }],
+                    generationConfig: genConfig
+                };
+            }
 
             let response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
                 method: 'POST',
@@ -2126,8 +2146,10 @@ async function fetchGemini(prompt, apiKey, options = {}) {
                 body: JSON.stringify(requestBody)
             });
 
-            // もし検索グラウンディングが対象モデル・キー環境で非対応(400)だった場合は、即座にStructured Outputsモードで再試行
-            if (!response.ok && response.status === 400 && useSearchGrounding) {
+            // もし検索グラウンディングが対象モデル・キー環境で非対応(400)だった場合：
+            // ・Gemini 4 (無料枠ではGoogle検索グラウンディング非対応) の場合は、Web検索機能を維持したまま Gemini 2.5 Flash へフォールバックさせる
+            // ・それ以外のモデルの場合は Structured Outputs モードで再試行する
+            if (!response.ok && response.status === 400 && useSearchGrounding && !isGemini4) {
                 const errCheck = await response.text().catch(() => '');
                 if (!errCheck.includes('API_KEY_INVALID')) {
                     console.warn(`[Gemini] Search grounding unsupported on ${model}, falling back to Structured Outputs.`);
@@ -2173,7 +2195,8 @@ async function fetchGemini(prompt, apiKey, options = {}) {
             const data = await response.json();
             const candidate = data?.candidates?.[0];
             const parts = candidate?.content?.parts || [];
-            const rawText = parts.map(p => p.text || '').join('\n');
+            // Gemini 4 の思考プロセス出力（thought: true）を除外して最終回答本文のみを抽出
+            const rawText = parts.filter(p => !p.thought).map(p => p.text || '').join('\n');
             let quiz = validateAndNormalizeQuiz(parseRobustJSON(rawText), options);
             quiz.exam = currentExam;
             quiz.category = currentCategory;
@@ -3538,10 +3561,13 @@ ${userQuestion}
         let lastErr = null;
         for (const model of geminiModels) {
             try {
+                const isGemini4 = model.startsWith('gemini-4');
                 const reqBody = {
-                    contents: [{ parts: [{ text: tutorPrompt }] }],
-                    generationConfig: { temperature: 0.6 }
+                    contents: [{ parts: [{ text: tutorPrompt }] }]
                 };
+                if (!isGemini4) {
+                    reqBody.generationConfig = { temperature: 0.6 };
+                }
                 if (useSearchGrounding) {
                     reqBody.tools = [{ google_search: {} }];
                 }
@@ -3550,7 +3576,7 @@ ${userQuestion}
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(reqBody)
                 });
-                if (!res.ok && res.status === 400 && useSearchGrounding) {
+                if (!res.ok && res.status === 400 && useSearchGrounding && !isGemini4) {
                     delete reqBody.tools;
                     res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
                         method: 'POST',
@@ -3566,7 +3592,7 @@ ${userQuestion}
                 }
                 const data = await res.json();
                 const parts = data?.candidates?.[0]?.content?.parts || [];
-                const text = parts.map(p => p.text || '').join('\n').trim();
+                const text = parts.filter(p => !p.thought).map(p => p.text || '').join('\n').trim();
                 if (text) return text;
             } catch (e) {
                 if (e.message === 'AUTH_ERROR') throw e;
