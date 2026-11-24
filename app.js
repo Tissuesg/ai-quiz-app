@@ -481,13 +481,24 @@ const SYLLABUS_DATA = {
     }
 };
 
-// Changelog Data (v1.00 - v2.20)
+// Changelog Data (v1.00 - v2.2.1)
 const CHANGELOG_DATA = [
+    {
+        version: "v2.2.1",
+        date: "2026/11/24",
+        tag: "最新・Gemini 4 Hydrogen 無料枠対応",
+        latest: true,
+        items: [
+            "✨ Googleの最新世代モデル「Gemini 4 Hydrogen (gemini-4-hydrogen)」の無料API枠に最優先対応（既存のGemini APIキーのまま取り直し不要で利用可能）",
+            "🛡️ 自動フォールバックを3段階構成（gemini-4-hydrogen → gemini-2.5-flash → gemini-2.5-flash-lite）へ強化し、法令・税務・計算問題の精度向上と無料枠の連続演習耐性を大幅に改善",
+            "🎓 AI専門講師チャット（深掘り質問）も Gemini 4 Hydrogen 最優先＋自動フォールバックに対応し、問題カード上のバッジに実際に使用されたモデル名を表示するよう改善"
+        ]
+    },
     {
         version: "v2.20",
         date: "2026/11/11",
-        tag: "最新・3階層シラバス＆学習現在地マップ",
-        latest: true,
+        tag: "3階層シラバス＆学習現在地マップ",
+        latest: false,
         items: [
             "📚 全7資格・38出題分野をさらに細分化した「3階層シラバス（資格 ＞ 出題分野 ＞ 小分類・重要論点）」を搭載（例：診断士の経営情報システムをハード・DB・ネットワーク・開発・セキュリティ・法規等9論点に細分化し、特定テーマへの出題偏りを完全解消）",
             "🎲 3つのスマート出題モード（『🗺️ 未学習・手薄な論点を優先（網羅モード）』『🎯 苦手・誤答が多い論点を優先（弱点特化モード）』『🎲 分野内から完全ランダム（直近5問の重複排除）』）＋個別論点のピンポイント指定に対応",
@@ -1672,12 +1683,12 @@ async function fetchQuizData(fetchOptions = {}) {
     recordRecentSubtopic(targetSubtopic);
 
     const badgeNames = {
-        gemini: useSearchGrounding ? 'Gemini 2.5 (🌐Web検索連動)' : 'Gemini 2.5 Flash',
+        gemini: useSearchGrounding ? 'Gemini 4 Hydrogen (🌐Web検索連動)' : 'Gemini 4 Hydrogen',
         groq: 'Groq (Llama 3.3 / 4)',
         openrouter: 'OpenRouter (Free)',
         openai: 'GPT-4.1 / 4o mini'
     };
-    engineBadge.textContent = badgeNames[engine] || 'Gemini 2.5 Flash';
+    engineBadge.textContent = badgeNames[engine] || 'Gemini 4 Hydrogen';
 
     const examConfig = EXAM_DATA[currentExam];
     const isChoiceOnly = examConfig && examConfig.formatType === 'choice_only';
@@ -2078,8 +2089,9 @@ function extractGeminiGrounding(candidate) {
 async function fetchGemini(prompt, apiKey, options = {}) {
     const { useSearchGrounding = false, selectedFormat = 'auto', isChoiceOnly = false } = options;
 
-    // Gemini マルチモデル・フォールバック（廃止された2.0系を除外し、現行稼働の2.5系2モデルで安定運用）
+    // Gemini マルチモデル・フォールバック（最新の Gemini 4 Hydrogen 無料枠を最優先し、制限時は 2.5 Flash / Lite へ自動切替）
     const geminiModels = [
+        'gemini-4-hydrogen',
         'gemini-2.5-flash',
         'gemini-2.5-flash-lite'
     ];
@@ -2165,6 +2177,7 @@ async function fetchGemini(prompt, apiKey, options = {}) {
             let quiz = validateAndNormalizeQuiz(parseRobustJSON(rawText), options);
             quiz.exam = currentExam;
             quiz.category = currentCategory;
+            quiz.usedModel = model;
             quiz.grounding = extractGeminiGrounding(candidate);
             return quiz;
         } catch (e) {
@@ -2463,6 +2476,15 @@ function displayQuiz(quiz) {
         engineBadge.textContent = `復習: [${examLabel}] ${quiz.category}`;
     } else if (isBookmarkMode) {
         engineBadge.textContent = `⭐ ブックマーク: [${examLabel}] ${quiz.category}`;
+    } else if (quiz.usedModel) {
+        const modelDisplayMap = {
+            'gemini-4-hydrogen': 'Gemini 4 Hydrogen',
+            'gemini-2.5-flash': 'Gemini 2.5 Flash',
+            'gemini-2.5-flash-lite': 'Gemini 2.5 Flash-Lite'
+        };
+        const displayModelName = modelDisplayMap[quiz.usedModel] || quiz.usedModel;
+        const hasGrounding = Boolean(quiz.grounding && ((quiz.grounding.sources && quiz.grounding.sources.length > 0) || (quiz.grounding.queries && quiz.grounding.queries.length > 0)));
+        engineBadge.textContent = hasGrounding ? `${displayModelName} (🌐Web検索連動)` : displayModelName;
     }
 
     // 小分類（論点）バッジの表示制御 (v2.20)
@@ -3512,7 +3534,7 @@ ${userQuestion}
 - JSONではなく、そのまま読めるMarkdownテキストとして出力してください。`;
 
     if (engine === 'gemini') {
-        const geminiModels = ['gemini-2.5-flash', 'gemini-2.5-flash-lite'];
+        const geminiModels = ['gemini-4-hydrogen', 'gemini-2.5-flash', 'gemini-2.5-flash-lite'];
         let lastErr = null;
         for (const model of geminiModels) {
             try {

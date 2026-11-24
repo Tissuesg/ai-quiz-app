@@ -1,4 +1,4 @@
-# ✨ QuaGenius (v2.20) - AI過去問ジェネレーター & AI家庭教師
+# ✨ QuaGenius (v2.2.1) - AI過去問ジェネレーター & AI家庭教師
 
 『QuaGenius』は、AIのパワーを最大限に活用し、資格試験対策用の良質な過去問を動的に自動生成し、その場でAI専門講師に深掘り質問までできる次世代の学習プラットフォームです。
 現在、**「中小企業診断士」**、**「FP1級 (学科)」**、**「税理士」**、**「日商簿記2級」**、**「日商簿記1級」**、**「ITパスポート」**、および**「宅地建物取引士」**の7つの人気・難関資格に対応しています。
@@ -79,7 +79,7 @@
 *   **Marked.js**: Markdown解説文の高速パース（CDN経由）。
 *   **ローカルストレージ (LocalStorage)**: 統計データ、復習問題ストック、APIキーなどの完全なフロントエンド完結型保存。
 *   **AIエンジン（マルチモデル・自動フォールバック搭載）**:
-    *   `Google Gemini` (`gemini-2.5-flash` / `gemini-2.5-flash-lite` / `gemini-2.0-flash`) — 無料枠あり・推奨
+    *   `Google Gemini` (`gemini-4-hydrogen` / `gemini-2.5-flash` / `gemini-2.5-flash-lite`) — 無料枠あり・最優先推奨
     *   `Groq` (`llama-3.3-70b-versatile` / `llama-4-scout-17b-16e-instruct` / `llama-3.1-8b-instant`) — 無料枠あり・超高速LPU推論
     *   `OpenRouter` (`openrouter/free` 自動ルーター / `llama-3.3-70b` / `deepseek-chat` / `qwen-2.5-72b`) — 無料枠あり
     *   `OpenAI` (`gpt-4.1-mini` / `gpt-4o-mini`) — 有料APIキー向け

@@ -17,7 +17,7 @@
     <div id="app">
         <header>
             <div class="logo">
-                <span class="icon">✨</span> <span class="logo-text">QuaGenius</span> <span class="version-badge clickable-badge" id="versionBadge" title="更新履歴 (Changelog) を見る">v2.20</span>
+                <span class="icon">✨</span> <span class="logo-text">QuaGenius</span> <span class="version-badge clickable-badge" id="versionBadge" title="更新履歴 (Changelog) を見る">v2.2.1</span>
             </div>
             <div class="header-actions">
                 <button id="syllabusHeaderBtn" class="icon-btn" title="シラバス網羅マップ＆弱点傾向分析（学習の現在地）">🗺️</button>
@@ -115,7 +115,7 @@
             <!-- Quiz Display Area -->
             <div id="quizSection" class="glass-card quiz-section hidden">
                 <div class="quiz-badges-row">
-                    <div class="badge" id="engineBadge">Gemini 2.5</div>
+                    <div class="badge" id="engineBadge">Gemini 4 Hydrogen</div>
                     <div class="badge subtopic-badge hidden" id="subtopicBadge">📌 論点</div>
                 </div>
                 <div id="questionText" class="markdown-body question-markdown">問題文がここに表示されます。</div>
@@ -270,7 +270,7 @@
             <div class="engine-toggle" style="display: flex; flex-direction: column; gap: 0.6rem;">
                 <label class="radio-label">
                     <input type="radio" name="aiEngine" value="gemini" checked>
-                    <span>Gemini 2.5 Flash / Lite (推奨・無料枠あり・自動フォールバック)</span>
+                    <span>Gemini 4 Hydrogen / 2.5 Flash (推奨・無料枠あり・自動フォールバック)</span>
                 </label>
                 <label class="radio-label">
                     <input type="radio" name="aiEngine" value="groq">
@@ -359,6 +359,7 @@
                             <ul>
                                 <li>APIキー一覧画面の右端にある <strong><code>Plan</code>（プラン）列</strong> を見て、<strong><code>Free of charge</code>（または日本語で「無料」）</strong> と書かれていれば完全無料です。</li>
                                 <li><code>Set up Billing</code>（請求先の設定）という青いリンクが表示されている状態＝「まだ課金設定をしていない（＝無料枠で稼働中）」という意味です。</li>
+                                <li>本アプリは既存の無料APIキーのままで最新の <strong><code>Gemini 4 Hydrogen</code></strong> を最優先使用し、制限時は <code>Gemini 2.5 Flash / Lite</code> へ自動切替します。</li>
                             </ul>
                         </div>
                     </div>
