@@ -2832,6 +2832,12 @@ select:focus, input:focus {
     white-space: pre;
 }
 
+/* 設定モーダルの上から開くガイド系モーダルを確実に最前面へ表示 */
+#gasGuideModal,
+#apiGuideModal {
+    z-index: 1200;
+}
+
 
 
 

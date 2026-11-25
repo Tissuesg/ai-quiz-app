@@ -4017,10 +4017,26 @@ function initCloudSyncUI() {
     }
 
     if (statsCloudPushBtn) {
-        statsCloudPushBtn.addEventListener('click', () => pushCloudData(true));
+        statsCloudPushBtn.addEventListener('click', () => {
+            if (!getCloudSyncConfig().enabled) {
+                if (statsModal) statsModal.classList.add('hidden');
+                if (apiModal) apiModal.classList.remove('hidden');
+                showToast('⚙️ まずGAS URLと合言葉を設定してください');
+                if (gasUrlInput) setTimeout(() => gasUrlInput.focus(), 100);
+                return;
+            }
+            pushCloudData(true);
+        });
     }
     if (statsCloudPullBtn) {
         statsCloudPullBtn.addEventListener('click', () => {
+            if (!getCloudSyncConfig().enabled) {
+                if (statsModal) statsModal.classList.add('hidden');
+                if (apiModal) apiModal.classList.remove('hidden');
+                showToast('⚙️ まずGAS URLと合言葉を設定してください');
+                if (gasUrlInput) setTimeout(() => gasUrlInput.focus(), 100);
+                return;
+            }
             if (confirm('Googleドライブ上の最新データでこの端末のデータを上書き復元しますか？')) {
                 pullCloudData(true);
             }
