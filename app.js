@@ -481,13 +481,24 @@ const SYLLABUS_DATA = {
     }
 };
 
-// Changelog Data (v1.00 - v2.2.2)
+// Changelog Data (v1.00 - v2.30)
 const CHANGELOG_DATA = [
+    {
+        version: "v2.30",
+        date: "2026/11/25",
+        tag: "最新・Googleドライブ自動クラウド同期",
+        latest: true,
+        items: [
+            "☁️ Googleドライブ自動クラウド同期（Google Apps Script方式）を搭載！GitHub PagesをPC・スマホ・タブレットなど複数端末から開いても、学習実績・シラバス塗りつぶし進捗・復習ストック・ブックマーク・AI講師チャット履歴を自動同期",
+            "🛡️ 合言葉（シークレットトークン）認証＋新しい端末から開いた際に空データでクラウド側を誤上書きしない安全ガードを搭載",
+            "📖 ⚙️設定画面内に「3分で完了！GASセットアップ手順＆ワンクリックでコードコピー」ガイドを内蔵し、ヘッダーの☁️ステータスバッジおよび📊成績ダッシュボードからいつでも手動同期・確認が可能"
+        ]
+    },
     {
         version: "v2.2.2",
         date: "2026/11/24",
-        tag: "最新・Gemini 4 Hydrogen 通信仕様最適化",
-        latest: true,
+        tag: "Gemini 4 Hydrogen 通信仕様最適化",
+        latest: false,
         items: [
             "🔧 Gemini 4 Hydrogen (gemini-4-hydrogen) で非対応の temperature パラメータ送信によるHTTP 400フォールバックを修正（通常モードで確実に Gemini 4 Hydrogen が稼働するよう最適化）",
             "🧠 Gemini 4 の思考プロセス出力（thought: true パーツ）をレスポンス解析時に自動除外し、JSON解析やAI専門講師チャットの安定性を向上",
@@ -697,10 +708,34 @@ let isSpeaking = false;
 let currentTutorHistory = [];
 let isTutorLoading = false;
 
+// Cloud Sync State (v2.30: Google Drive via GAS)
+let cloudSyncReady = false;
+let cloudSyncTimer = null;
+let isCloudSyncing = false;
+let hasPendingTimeSync = false;
+let localUpdatedAt = localStorage.getItem('quagenius_updated_at') || null;
+
 // DOM Elements
 const settingsBtn = document.getElementById('settingsBtn');
 const statsBtn = document.getElementById('statsBtn');
+const cloudSyncHeaderBtn = document.getElementById('cloudSyncHeaderBtn');
+const cloudSyncDot = document.getElementById('cloudSyncDot');
 const syllabusHeaderBtn = document.getElementById('syllabusHeaderBtn');
+
+// Cloud Sync Modal & Guide Controls (v2.30)
+const gasUrlInput = document.getElementById('gasUrlInput');
+const gasTokenInput = document.getElementById('gasTokenInput');
+const testCloudSyncBtn = document.getElementById('testCloudSyncBtn');
+const cloudSyncModalStatus = document.getElementById('cloudSyncModalStatus');
+const openGasGuideBtn = document.getElementById('openGasGuideBtn');
+const gasGuideModal = document.getElementById('gasGuideModal');
+const closeGasGuideBtn = document.getElementById('closeGasGuideBtn');
+const closeGasGuideFooterBtn = document.getElementById('closeGasGuideFooterBtn');
+const copyGasCodeBtn = document.getElementById('copyGasCodeBtn');
+const gasCodePreview = document.getElementById('gasCodePreview');
+const statsCloudStatusText = document.getElementById('statsCloudStatusText');
+const statsCloudPushBtn = document.getElementById('statsCloudPushBtn');
+const statsCloudPullBtn = document.getElementById('statsCloudPullBtn');
 const bookmarksHeaderBtn = document.getElementById('bookmarksHeaderBtn');
 const apiGuideHeaderBtn = document.getElementById('apiGuideHeaderBtn');
 const openApiGuideBtn = document.getElementById('openApiGuideBtn');
@@ -933,13 +968,16 @@ function init() {
     // Escキーで開いているモーダルを閉じる
     document.addEventListener('keydown', (e) => {
         if (e.key === 'Escape') {
-            [syllabusModal, apiGuideModal, statsModal, bookmarkModal, changelogModal, apiModal].forEach(m => {
+            [gasGuideModal, syllabusModal, apiGuideModal, statsModal, bookmarkModal, changelogModal, apiModal].forEach(m => {
                 if (m && !m.classList.contains('hidden')) {
                     m.classList.add('hidden');
                 }
             });
         }
     });
+
+    // v2.30: Googleドライブ自動クラウド同期 (GAS) リスナー＆起動時自動同期
+    initCloudSyncUI();
 
     // Bookmark Modal & Action Listeners
     if (bookmarksHeaderBtn) {
@@ -1072,6 +1110,7 @@ function init() {
             updateSubtopicsUI();
             renderSyllabusMiniBar();
             updateReviewBtnState();
+            markLocalDataUpdated(true);
             showToast('統計データと復習ストックをリセットしました');
         }
     });
@@ -1353,8 +1392,24 @@ function saveApiSettings() {
     if (openrouterKey) localStorage.setItem('openrouter_api_key', openrouterKey);
     if (oKey) localStorage.setItem('openai_api_key', oKey);
 
+    // v2.30: Googleドライブ自動同期設定の保存
+    const prevCfg = getCloudSyncConfig();
+    const newGasUrl = gasUrlInput ? gasUrlInput.value.trim() : '';
+    const newGasToken = gasTokenInput ? gasTokenInput.value.trim() : '';
+    localStorage.setItem('quagenius_gas_url', newGasUrl);
+    localStorage.setItem('quagenius_gas_token', newGasToken);
+
     apiModal.classList.add('hidden');
     showToast('設定を保存しました');
+
+    if (newGasUrl && newGasToken) {
+        if (newGasUrl !== prevCfg.url || newGasToken !== prevCfg.token || !cloudSyncReady) {
+            syncCloudOnStartup(true);
+        }
+    } else {
+        cloudSyncReady = false;
+        setCloudSyncStatus('off', '未設定');
+    }
 }
 
 function updateFormatSelectUI() {
@@ -2722,6 +2777,7 @@ function handleSelfGradeOverride() {
     updateSubtopicsUI(true);
     renderSyllabusMiniBar();
     updateReviewBtnState();
+    markLocalDataUpdated(true);
     showToast('正解として統計に反映しました');
 }
 
@@ -3263,6 +3319,9 @@ function syncQuizToStorage(quiz) {
     if (mkUpdated) {
         localStorage.setItem('quagenius_mistakes', JSON.stringify(mistakes));
     }
+    if (bmUpdated || mkUpdated) {
+        markLocalDataUpdated(true);
+    }
 }
 
 function updateBookmarkToggleUI() {
@@ -3288,6 +3347,7 @@ function toggleCurrentQuizBookmark() {
         bookmarks.splice(existingIdx, 1);
         localStorage.setItem('quagenius_bookmarks', JSON.stringify(bookmarks));
         updateBookmarkBtnState();
+        markLocalDataUpdated(true);
         showToast('ブックマークを解除しました');
     } else {
         const bookmarkEntry = {
@@ -3298,6 +3358,7 @@ function toggleCurrentQuizBookmark() {
         bookmarks.unshift(bookmarkEntry);
         localStorage.setItem('quagenius_bookmarks', JSON.stringify(bookmarks));
         updateBookmarkBtnState();
+        markLocalDataUpdated(true);
         showToast('⭐ 問題・解説・チャット履歴をブックマークに保存しました');
     }
 }
@@ -3366,6 +3427,7 @@ function renderBookmarkList() {
             localStorage.setItem('quagenius_bookmarks', JSON.stringify(bookmarks));
             updateBookmarkBtnState();
             renderBookmarkList();
+            markLocalDataUpdated(true);
             showToast('ブックマークから削除しました');
         });
 
@@ -3510,6 +3572,7 @@ function importAllData(file) {
             renderSyllabusMiniBar();
             updateReviewBtnState();
             updateBookmarkBtnState();
+            markLocalDataUpdated(true);
             showToast(`✅ バックアップを復元しました（ブックマーク${bookmarks.length}件・復習${mistakes.length}件）`);
         } catch (err) {
             console.error('[Backup Import Error]', err);
@@ -3517,6 +3580,465 @@ function importAllData(file) {
         }
     };
     reader.readAsText(file);
+}
+
+// ==========================================================================
+// v2.30: Googleドライブ自動クラウド同期 (Google Apps Script 連携)
+// ==========================================================================
+
+const GAS_TEMPLATE_CODE = `/**
+ * QuaGenius v2.30 - Googleドライブ自動クラウド同期用バックエンド (Google Apps Script)
+ */
+const SECRET_TOKEN = 'CHANGE_THIS_TO_YOUR_SECRET'; // ← お好きな合言葉に変更してください
+const FOLDER_NAME = 'QuaGenius_Sync';
+const FILE_NAME = 'quagenius_cloud_sync.json';
+
+function doGet() {
+  return ContentService.createTextOutput(
+    JSON.stringify({ ok: true, app: 'QuaGenius Cloud Sync', message: '正常に稼働しています。' })
+  ).setMimeType(ContentService.MimeType.JSON);
+}
+
+function doPost(e) {
+  try {
+    const rawBody = (e && e.postData && e.postData.contents) ? e.postData.contents : '{}';
+    const req = JSON.parse(rawBody);
+    if (!req.token || req.token !== SECRET_TOKEN) {
+      return jsonResponse({ ok: false, error: 'INVALID_TOKEN', message: '合言葉（シークレットトークン）が一致しません。' });
+    }
+    const action = req.action || 'load';
+    if (action === 'ping') {
+      const existing = readSyncFile();
+      return jsonResponse({ ok: true, hasData: Boolean(existing), updatedAt: existing ? existing.updatedAt : null });
+    }
+    if (action === 'load') {
+      const existing = readSyncFile();
+      return jsonResponse({ ok: true, hasData: Boolean(existing), data: existing || null });
+    }
+    if (action === 'save') {
+      if (!req.payload || typeof req.payload !== 'object') {
+        return jsonResponse({ ok: false, error: 'INVALID_PAYLOAD', message: '保存データが不正です。' });
+      }
+      const savedAt = req.payload.updatedAt || new Date().toISOString();
+      req.payload.updatedAt = savedAt;
+      writeSyncFile(req.payload);
+      return jsonResponse({ ok: true, updatedAt: savedAt });
+    }
+    return jsonResponse({ ok: false, error: 'UNKNOWN_ACTION', message: '不明なアクションです。' });
+  } catch (err) {
+    return jsonResponse({ ok: false, error: 'SERVER_ERROR', message: String(err) });
+  }
+}
+
+function getOrCreateSyncFolder() {
+  const folders = DriveApp.getFoldersByName(FOLDER_NAME);
+  return folders.hasNext() ? folders.next() : DriveApp.createFolder(FOLDER_NAME);
+}
+
+function readSyncFile() {
+  const folder = getOrCreateSyncFolder();
+  const files = folder.getFilesByName(FILE_NAME);
+  if (!files.hasNext()) return null;
+  const content = files.next().getBlob().getDataAsString('UTF-8');
+  return content ? JSON.parse(content) : null;
+}
+
+function writeSyncFile(dataObj) {
+  const folder = getOrCreateSyncFolder();
+  const jsonText = JSON.stringify(dataObj, null, 2);
+  const files = folder.getFilesByName(FILE_NAME);
+  if (files.hasNext()) {
+    files.next().setContent(jsonText);
+  } else {
+    folder.createFile(FILE_NAME, jsonText, MimeType.PLAIN_TEXT);
+  }
+}
+
+function jsonResponse(obj) {
+  return ContentService.createTextOutput(JSON.stringify(obj)).setMimeType(ContentService.MimeType.JSON);
+}`;
+
+function getCloudSyncConfig() {
+    const url = (localStorage.getItem('quagenius_gas_url') || '').trim();
+    const token = (localStorage.getItem('quagenius_gas_token') || '').trim();
+    return { url, token, enabled: Boolean(url && token) };
+}
+
+function hasLocalStudyData() {
+    return (stats && stats.total > 0) || (mistakes && mistakes.length > 0) || (bookmarks && bookmarks.length > 0);
+}
+
+function formatSyncTimeShort(isoStr) {
+    if (!isoStr) return '';
+    try {
+        const d = new Date(isoStr);
+        if (Number.isNaN(d.getTime())) return '';
+        const mm = String(d.getMonth() + 1).padStart(2, '0');
+        const dd = String(d.getDate()).padStart(2, '0');
+        const hh = String(d.getHours()).padStart(2, '0');
+        const mi = String(d.getMinutes()).padStart(2, '0');
+        return `${mm}/${dd} ${hh}:${mi}`;
+    } catch {
+        return '';
+    }
+}
+
+function setCloudSyncStatus(state, detailText = '') {
+    if (cloudSyncDot) {
+        cloudSyncDot.className = `sync-dot sync-dot-${state}`;
+    }
+    const labelMap = {
+        off: '未設定',
+        syncing: '同期中...',
+        ok: detailText ? `同期済 (${detailText})` : '同期済',
+        error: detailText ? `エラー: ${detailText}` : '同期エラー'
+    };
+    const label = labelMap[state] || '未設定';
+
+    if (cloudSyncHeaderBtn) {
+        cloudSyncHeaderBtn.title = state === 'off'
+            ? 'Googleドライブ自動クラウド同期（未設定：クリックで設定）'
+            : `Googleドライブ自動クラウド同期：${label}（クリックで今すぐ同期）`;
+    }
+    if (cloudSyncModalStatus) {
+        cloudSyncModalStatus.textContent = label;
+        cloudSyncModalStatus.style.color = state === 'ok' ? '#34d399' : (state === 'error' ? '#f87171' : (state === 'syncing' ? '#38bdf8' : 'var(--text-secondary)'));
+    }
+    if (statsCloudStatusText) {
+        statsCloudStatusText.textContent = `☁️ クラウド同期: ${label}`;
+    }
+}
+
+async function callGasEndpoint(action, payload = null, overrideConfig = null) {
+    const cfg = overrideConfig || getCloudSyncConfig();
+    if (!cfg.url || !cfg.token) {
+        throw new Error('CLOUD_NOT_CONFIGURED');
+    }
+    const bodyObj = { action, token: cfg.token };
+    if (payload) bodyObj.payload = payload;
+
+    // text/plain 送信により CORS プリフライトを回避し、GitHub Pages / file:// 両方から安全に GAS へ通信
+    const res = await fetch(cfg.url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify(bodyObj)
+    });
+    if (!res.ok) {
+        throw new Error(`HTTP_${res.status}`);
+    }
+    const data = await res.json();
+    if (!data || !data.ok) {
+        const errCode = (data && data.error) || 'SYNC_FAILED';
+        const err = new Error(errCode);
+        err.detail = (data && data.message) || errCode;
+        throw err;
+    }
+    return data;
+}
+
+function buildCloudPayload() {
+    const nowIso = localUpdatedAt || new Date().toISOString();
+    return {
+        app: 'QuaGenius',
+        version: '2.30',
+        updatedAt: nowIso,
+        stats,
+        mistakes,
+        bookmarks
+    };
+}
+
+function applyCloudPayload(cloudData) {
+    if (!cloudData || typeof cloudData !== 'object') return;
+    if (cloudData.stats && typeof cloudData.stats === 'object') {
+        stats = {
+            total: Number(cloudData.stats.total) || 0,
+            correct: Number(cloudData.stats.correct) || 0,
+            categories: cloudData.stats.categories || {},
+            dailyHistory: cloudData.stats.dailyHistory || {},
+            subtopics: cloudData.stats.subtopics || {},
+            formatStats: cloudData.stats.formatStats || {
+                choice: { total: 0, correct: 0 },
+                input: { total: 0, correct: 0 },
+                calc: { total: 0, correct: 0 },
+                theory: { total: 0, correct: 0 }
+            }
+        };
+        localStorage.setItem('quagenius_stats', JSON.stringify(stats));
+    }
+    if (Array.isArray(cloudData.mistakes)) {
+        mistakes = cloudData.mistakes;
+        localStorage.setItem('quagenius_mistakes', JSON.stringify(mistakes));
+    }
+    if (Array.isArray(cloudData.bookmarks)) {
+        bookmarks = cloudData.bookmarks;
+        localStorage.setItem('quagenius_bookmarks', JSON.stringify(bookmarks));
+    }
+    if (cloudData.updatedAt) {
+        localUpdatedAt = cloudData.updatedAt;
+        localStorage.setItem('quagenius_updated_at', localUpdatedAt);
+    }
+
+    renderStats();
+    updateSubtopicsUI(true);
+    renderSyllabusMiniBar();
+    updateReviewBtnState();
+    updateBookmarkBtnState();
+}
+
+function markLocalDataUpdated(triggerAutoPush = true) {
+    localUpdatedAt = new Date().toISOString();
+    localStorage.setItem('quagenius_updated_at', localUpdatedAt);
+    hasPendingTimeSync = false;
+
+    const cfg = getCloudSyncConfig();
+    if (!triggerAutoPush || !cfg.enabled) return;
+
+    // 初回ロード完了前は空データでの誤上書き防止のため自動プッシュを控える
+    if (!cloudSyncReady) return;
+
+    if (cloudSyncTimer) clearTimeout(cloudSyncTimer);
+    cloudSyncTimer = setTimeout(() => {
+        cloudSyncTimer = null;
+        pushCloudData(false);
+    }, 2000);
+}
+
+async function pushCloudData(showNotification = false, overrideConfig = null) {
+    const cfg = overrideConfig || getCloudSyncConfig();
+    if (!cfg.url || !cfg.token) {
+        if (showNotification) showToast('⚙️ 設定画面でGAS URLと合言葉を設定してください');
+        return false;
+    }
+    if (isCloudSyncing) return false;
+    isCloudSyncing = true;
+    setCloudSyncStatus('syncing');
+
+    try {
+        if (!localUpdatedAt) {
+            localUpdatedAt = new Date().toISOString();
+            localStorage.setItem('quagenius_updated_at', localUpdatedAt);
+        }
+        const res = await callGasEndpoint('save', buildCloudPayload(), cfg);
+        cloudSyncReady = true;
+        hasPendingTimeSync = false;
+        const t = formatSyncTimeShort(res.updatedAt || localUpdatedAt);
+        setCloudSyncStatus('ok', t);
+        if (showNotification) {
+            showToast('☁️ Googleドライブへ最新データを保存しました');
+        }
+        return true;
+    } catch (e) {
+        console.error('[Cloud Sync Push Error]', e);
+        const msg = e.message === 'INVALID_TOKEN' ? '合言葉が不一致' : '通信失敗';
+        setCloudSyncStatus('error', msg);
+        if (showNotification) {
+            showToast(`⚠️ クラウド保存エラー: ${e.detail || msg}`);
+        }
+        return false;
+    } finally {
+        isCloudSyncing = false;
+    }
+}
+
+async function pullCloudData(forceOverwrite = true, overrideConfig = null) {
+    const cfg = overrideConfig || getCloudSyncConfig();
+    if (!cfg.url || !cfg.token) {
+        showToast('⚙️ 設定画面でGAS URLと合言葉を設定してください');
+        return false;
+    }
+    if (isCloudSyncing) return false;
+    isCloudSyncing = true;
+    setCloudSyncStatus('syncing');
+
+    try {
+        const res = await callGasEndpoint('load', null, cfg);
+        cloudSyncReady = true;
+        if (!res.hasData || !res.data) {
+            setCloudSyncStatus('ok', 'クラウド空');
+            showToast('☁️ Googleドライブ上にまだ保存データがありません');
+            return false;
+        }
+        if (forceOverwrite) {
+            applyCloudPayload(res.data);
+        }
+        const t = formatSyncTimeShort(res.data.updatedAt);
+        setCloudSyncStatus('ok', t);
+        showToast(`☁️ Googleドライブから最新データを読み込みました（${stats.total}問・ブックマーク${bookmarks.length}件）`);
+        return true;
+    } catch (e) {
+        console.error('[Cloud Sync Pull Error]', e);
+        const msg = e.message === 'INVALID_TOKEN' ? '合言葉が不一致' : '通信失敗';
+        setCloudSyncStatus('error', msg);
+        showToast(`⚠️ クラウド読込エラー: ${e.detail || msg}`);
+        return false;
+    } finally {
+        isCloudSyncing = false;
+    }
+}
+
+async function syncCloudOnStartup(manualTrigger = false, overrideConfig = null) {
+    const cfg = overrideConfig || getCloudSyncConfig();
+    if (!cfg.url || !cfg.token) {
+        cloudSyncReady = false;
+        setCloudSyncStatus('off');
+        return false;
+    }
+    if (isCloudSyncing) return false;
+    isCloudSyncing = true;
+    setCloudSyncStatus('syncing');
+
+    try {
+        const res = await callGasEndpoint('load', null, cfg);
+        const cloudData = res.hasData ? res.data : null;
+        const localHasData = hasLocalStudyData();
+
+        if (cloudData) {
+            const cloudTime = cloudData.updatedAt ? Date.parse(cloudData.updatedAt) : 0;
+            const localTime = localUpdatedAt ? Date.parse(localUpdatedAt) : 0;
+
+            // ローカルが空、またはクラウド側が新しい場合はクラウドを優先反映（空データ誤上書き防止）
+            if (!localHasData || cloudTime > localTime) {
+                applyCloudPayload(cloudData);
+                cloudSyncReady = true;
+                setCloudSyncStatus('ok', formatSyncTimeShort(cloudData.updatedAt));
+                showToast(`☁️ Googleドライブから最新データを同期しました（${stats.total}問・ブックマーク${bookmarks.length}件）`);
+                return true;
+            }
+            // ローカルの方が新しい場合はクラウドへ自動プッシュ
+            if (localTime > cloudTime) {
+                const saveRes = await callGasEndpoint('save', buildCloudPayload(), cfg);
+                cloudSyncReady = true;
+                setCloudSyncStatus('ok', formatSyncTimeShort(saveRes.updatedAt || localUpdatedAt));
+                if (manualTrigger) {
+                    showToast('☁️ この端末の最新データをGoogleドライブへ同期しました');
+                }
+                return true;
+            }
+            // 同一タイムスタンプ（すでに最新）
+            cloudSyncReady = true;
+            setCloudSyncStatus('ok', formatSyncTimeShort(cloudData.updatedAt));
+            if (manualTrigger) {
+                showToast('✅ Googleドライブとすでに最新状態です');
+            }
+            return true;
+        } else {
+            // クラウドにまだファイルが無い場合：ローカルにデータがあれば初回アップロード
+            cloudSyncReady = true;
+            if (localHasData) {
+                if (!localUpdatedAt) {
+                    localUpdatedAt = new Date().toISOString();
+                    localStorage.setItem('quagenius_updated_at', localUpdatedAt);
+                }
+                const saveRes = await callGasEndpoint('save', buildCloudPayload(), cfg);
+                setCloudSyncStatus('ok', formatSyncTimeShort(saveRes.updatedAt || localUpdatedAt));
+                showToast('☁️ 現在の学習データをGoogleドライブへ初回保存しました');
+            } else {
+                setCloudSyncStatus('ok', '接続OK');
+                if (manualTrigger) {
+                    showToast('✅ Googleドライブとの接続に成功しました！問題を解くと自動保存されます');
+                }
+            }
+            return true;
+        }
+    } catch (e) {
+        console.error('[Cloud Sync Startup Error]', e);
+        const msg = e.message === 'INVALID_TOKEN' ? '合言葉が不一致' : '接続失敗';
+        setCloudSyncStatus('error', msg);
+        if (manualTrigger) {
+            showToast(`⚠️ クラウド同期エラー: ${e.detail || 'GAS URL・デプロイ設定（全員アクセス）・合言葉をご確認ください'}`);
+        }
+        return false;
+    } finally {
+        isCloudSyncing = false;
+    }
+}
+
+function initCloudSyncUI() {
+    const cfg = getCloudSyncConfig();
+    if (gasUrlInput) gasUrlInput.value = cfg.url;
+    if (gasTokenInput) gasTokenInput.value = cfg.token;
+    if (gasCodePreview) gasCodePreview.textContent = GAS_TEMPLATE_CODE;
+
+    if (cloudSyncHeaderBtn) {
+        cloudSyncHeaderBtn.addEventListener('click', () => {
+            const currentCfg = getCloudSyncConfig();
+            if (!currentCfg.enabled) {
+                if (apiModal) apiModal.classList.remove('hidden');
+                if (gasUrlInput) setTimeout(() => gasUrlInput.focus(), 100);
+            } else {
+                syncCloudOnStartup(true);
+            }
+        });
+    }
+
+    if (openGasGuideBtn && gasGuideModal) {
+        openGasGuideBtn.addEventListener('click', () => {
+            gasGuideModal.classList.remove('hidden');
+            const bodyEl = gasGuideModal.querySelector('.stats-modal-body');
+            if (bodyEl) bodyEl.scrollTop = 0;
+        });
+    }
+    if (closeGasGuideBtn && gasGuideModal) {
+        closeGasGuideBtn.addEventListener('click', () => gasGuideModal.classList.add('hidden'));
+    }
+    if (closeGasGuideFooterBtn && gasGuideModal) {
+        closeGasGuideFooterBtn.addEventListener('click', () => gasGuideModal.classList.add('hidden'));
+    }
+    if (gasGuideModal) {
+        gasGuideModal.addEventListener('click', (e) => {
+            if (e.target === gasGuideModal) gasGuideModal.classList.add('hidden');
+        });
+    }
+    if (copyGasCodeBtn) {
+        copyGasCodeBtn.addEventListener('click', () => {
+            copyTextToClipboard(GAS_TEMPLATE_CODE, '📋 GASコードをクリップボードにコピーしました！');
+        });
+    }
+
+    if (testCloudSyncBtn) {
+        testCloudSyncBtn.addEventListener('click', async () => {
+            const url = gasUrlInput ? gasUrlInput.value.trim() : '';
+            const token = gasTokenInput ? gasTokenInput.value.trim() : '';
+            if (!url || !token) {
+                showToast('GAS ウェブアプリ URL と合言葉の両方を入力してください');
+                return;
+            }
+            if (!url.startsWith('https://script.google.com/')) {
+                showToast('⚠️ URLは https://script.google.com/... の形式で入力してください');
+                return;
+            }
+            localStorage.setItem('quagenius_gas_url', url);
+            localStorage.setItem('quagenius_gas_token', token);
+            testCloudSyncBtn.disabled = true;
+            await syncCloudOnStartup(true, { url, token, enabled: true });
+            testCloudSyncBtn.disabled = false;
+        });
+    }
+
+    if (statsCloudPushBtn) {
+        statsCloudPushBtn.addEventListener('click', () => pushCloudData(true));
+    }
+    if (statsCloudPullBtn) {
+        statsCloudPullBtn.addEventListener('click', () => {
+            if (confirm('Googleドライブ上の最新データでこの端末のデータを上書き復元しますか？')) {
+                pullCloudData(true);
+            }
+        });
+    }
+
+    // タブを離れる際に学習時間等の未同期分があれば軽く自動プッシュ
+    document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'hidden' && cloudSyncReady && hasPendingTimeSync) {
+            pushCloudData(false);
+        }
+    });
+
+    if (cfg.enabled) {
+        syncCloudOnStartup(false);
+    } else {
+        setCloudSyncStatus('off');
+    }
 }
 
 async function fetchTutorAnswer(userQuestion) {
@@ -3805,6 +4327,8 @@ function updateStatsAndMistakes(isCorrect) {
         }
     }
     updateReviewBtnState();
+    // Googleドライブ自動クラウド同期トリガー (v2.30)
+    markLocalDataUpdated(true);
 }
 
 // ==========================================================================
@@ -4210,6 +4734,13 @@ function updateTodayStudyTimeData() {
     // 5秒ごとにlocalStorageに保存してパフォーマンスを維持
     if (sessionSeconds % 5 === 0) {
         localStorage.setItem('quagenius_stats', JSON.stringify(stats));
+        hasPendingTimeSync = true;
+    }
+    // 60秒ごとにクラウドへ学習時間も自動反映
+    if (sessionSeconds > 0 && sessionSeconds % 60 === 0 && cloudSyncReady && hasPendingTimeSync) {
+        localUpdatedAt = new Date().toISOString();
+        localStorage.setItem('quagenius_updated_at', localUpdatedAt);
+        pushCloudData(false);
     }
 }
 

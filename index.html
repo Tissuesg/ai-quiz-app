@@ -17,9 +17,10 @@
     <div id="app">
         <header>
             <div class="logo">
-                <span class="icon">✨</span> <span class="logo-text">QuaGenius</span> <span class="version-badge clickable-badge" id="versionBadge" title="更新履歴 (Changelog) を見る">v2.2.2</span>
+                <span class="icon">✨</span> <span class="logo-text">QuaGenius</span> <span class="version-badge clickable-badge" id="versionBadge" title="更新履歴 (Changelog) を見る">v2.30</span>
             </div>
             <div class="header-actions">
+                <button id="cloudSyncHeaderBtn" class="icon-btn cloud-sync-btn" title="Googleドライブ自動クラウド同期（未設定：クリックで設定・同期）">☁️<span id="cloudSyncDot" class="sync-dot sync-dot-off"></span></button>
                 <button id="syllabusHeaderBtn" class="icon-btn" title="シラバス網羅マップ＆弱点傾向分析（学習の現在地）">🗺️</button>
                 <button id="bookmarksHeaderBtn" class="icon-btn" title="ブックマーク一覧（保存した良問・解説・チャット）">⭐</button>
                 <button id="statsBtn" class="icon-btn" title="成績・統計・データバックアップ">📊</button>
@@ -254,13 +255,14 @@
         </main>
     </div>
 
-    <!-- API Key Modal -->
+    <!-- API Key & Cloud Sync Settings Modal -->
     <div id="apiModal" class="modal hidden">
-        <div class="modal-content glass-card" style="max-width: 560px;">
+        <div class="modal-content glass-card api-modal-content" style="max-width: 580px;">
             <div class="modal-header">
-                <h2 style="margin-bottom: 0;">⚙️ 初期設定・AIエンジン選択</h2>
+                <h2 style="margin-bottom: 0;">⚙️ 設定（AIエンジン・クラウド自動同期）</h2>
                 <button id="closeApiModalBtn" class="icon-btn" title="閉じる (Esc)">✖</button>
             </div>
+            <div class="api-modal-body">
             <p class="modal-desc" style="margin-top: 0.5rem; margin-bottom: 0.9rem;">問題生成に使用するAIエンジンを選択し、APIキーを入力してください。キーは端末内のブラウザにのみ安全に保存されます。</p>
 
             <button type="button" id="openApiGuideBtn" class="api-guide-banner-btn">
@@ -320,7 +322,32 @@
                     <a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener noreferrer" class="link-btn text-small">🔗 OpenAI Platformでキーを取得 (要課金登録)</a>
                 </div>
             </div>
-            
+
+            <!-- v2.30: Googleドライブ自動クラウド同期設定 (GAS方式) -->
+            <div class="cloud-sync-settings-box mt-4">
+                <div class="cloud-sync-settings-header">
+                    <h3>☁️ Googleドライブ自動クラウド同期（任意・完全無料）</h3>
+                    <button type="button" id="openGasGuideBtn" class="gas-guide-link-btn">📖 3分セットアップ手順＆コード</button>
+                </div>
+                <p class="cloud-sync-settings-desc">ご自身のGoogleドライブへ学習実績・シラバス進捗・復習・ブックマークを自動保存し、PC・スマホなど複数端末間でシームレスに同期します。</p>
+
+                <div class="input-group mt-2">
+                    <label for="gasUrlInput">GAS ウェブアプリ URL</label>
+                    <input type="url" id="gasUrlInput" placeholder="https://script.google.com/macros/s/....../exec" autocomplete="off">
+                </div>
+                <div class="input-group mt-2">
+                    <label for="gasTokenInput">合言葉（シークレットトークン）</label>
+                    <input type="password" id="gasTokenInput" placeholder="GASコードに設定した任意の合言葉" autocomplete="off">
+                </div>
+                <div class="cloud-sync-inline-actions mt-2">
+                    <button type="button" id="testCloudSyncBtn" class="secondary-btn" style="flex: 1; font-size: 0.84rem; padding: 0.55rem 0.8rem;">
+                        🔗 接続テスト＆今すぐ同期
+                    </button>
+                    <span id="cloudSyncModalStatus" class="cloud-sync-status-label">未設定</span>
+                </div>
+            </div>
+            </div>
+
             <div class="modal-actions mt-4">
                 <button id="saveApiBtn" class="primary-btn">保存して始める</button>
             </div>
@@ -485,18 +512,25 @@
 
                 </div>
                 
-                <!-- v2.10: データ保護・外部バックアップ書き出し＆復元（クラウドドライブ保存対応） -->
+                <!-- v2.10 / v2.30: データ保護・Googleドライブ自動同期＆JSON手動バックアップ -->
                 <div class="backup-restore-section border-top">
                     <div class="backup-restore-header">
-                        <h3>☁️ 学習データの外部バックアップ・復元</h3>
-                        <p class="backup-restore-desc">ブラウザのキャッシュ削除や機種変更に備えて、成績・復習ストック・ブックマーク（AI講師チャット履歴含む）をJSONファイルとしてGoogleドライブやiCloud、端末内に保存・復元できます。</p>
+                        <h3>☁️ クラウド自動同期 ＆ 手動バックアップ</h3>
+                        <p class="backup-restore-desc">Googleドライブ自動同期（⚙️設定から3分で連携）を有効にすると、複数端末間で自動同期されます。手動でJSONファイル書き出し／復元も可能です。</p>
                     </div>
-                    <div class="backup-restore-actions">
+                    <div class="cloud-stats-bar">
+                        <span id="statsCloudStatusText" class="cloud-stats-status">☁️ クラウド同期: 未設定</span>
+                        <div class="cloud-stats-btns">
+                            <button type="button" id="statsCloudPushBtn" class="tutor-tool-btn" title="現在の端末データをGoogleドライブへ今すぐ保存します">☁️ 今すぐクラウドへ保存</button>
+                            <button type="button" id="statsCloudPullBtn" class="tutor-tool-btn" title="Googleドライブ上の最新データでこの端末を上書き復元します">⬇️ クラウドから読込</button>
+                        </div>
+                    </div>
+                    <div class="backup-restore-actions mt-2">
                         <button type="button" id="exportDataBtn" class="secondary-btn flex-1">
-                            💾 バックアップを保存 (.json)
+                            💾 JSONバックアップ保存 (.json)
                         </button>
                         <button type="button" id="importDataBtn" class="secondary-btn flex-1">
-                            📂 バックアップから復元
+                            📂 JSONバックアップ復元
                         </button>
                         <input type="file" id="importDataInput" accept=".json,application/json" class="hidden">
                     </div>
@@ -654,6 +688,79 @@
 
             <div class="modal-actions stats-modal-footer border-top">
                 <button type="button" id="closeSyllabusFooterBtn" class="secondary-btn" style="width: 100%;">閉じる</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- v2.30: Googleドライブ自動クラウド同期 (GAS) セットアップガイドモーダル -->
+    <div id="gasGuideModal" class="modal hidden">
+        <div class="modal-content glass-card stats-modal-content" style="max-width: 820px; width: 100%;">
+            <div class="modal-header stats-modal-header">
+                <h2>☁️ 3分で完了！Googleドライブ自動同期（GAS）セットアップ手順</h2>
+                <button id="closeGasGuideBtn" class="icon-btn" title="閉じる (Esc)">✖</button>
+            </div>
+            <div class="stats-modal-body api-guide-body">
+                <div class="guide-alert-box">
+                    <div class="guide-alert-title">🛡️ 完全無料＆データはご自身のGoogleドライブだけに保存されます</div>
+                    <p>ご自身のGoogleアカウントに小さなスクリプト（Google Apps Script）を1つ設置するだけで、PC・スマホ・タブレットのどこからGitHub Pagesを開いても自動で学習データが同期されます。ファイルはGoogleドライブ内の <code>QuaGenius_Sync/quagenius_cloud_sync.json</code> に自動保存されます。</p>
+                </div>
+
+                <div class="guide-card">
+                    <div class="guide-card-header">
+                        <span class="guide-provider-badge badge-gemini">STEP 1</span>
+                        <h3>Google Apps Script にコードを貼り付けて保存</h3>
+                    </div>
+                    <div class="guide-steps">
+                        <ol>
+                            <li><a href="https://script.google.com/home/start" target="_blank" rel="noopener noreferrer" class="link-btn">Google Apps Script を開く</a> をクリックし、左上の <strong>「新しいプロジェクト」</strong> を押します。</li>
+                            <li>下の「📋 GASコードをコピー」ボタンを押して、エディタ内の既存コードをすべて消してから貼り付けます。</li>
+                            <li>コード内の <code>CHANGE_THIS_TO_YOUR_SECRET</code> を、<strong>お好きな合言葉</strong>（例: <code>my-quiz-2026</code> など半角英数字）に書き換えて、上部アイコン（または <code>Ctrl+S</code>）で保存します。</li>
+                        </ol>
+                        <div class="gas-code-toolbar">
+                            <span>📄 <code>quagenius_sync.gs</code>（そのままコピペ用）</span>
+                            <button type="button" id="copyGasCodeBtn" class="tutor-tool-btn">📋 GASコードをコピー</button>
+                        </div>
+                        <pre class="gas-code-block"><code id="gasCodePreview"></code></pre>
+                    </div>
+                </div>
+
+                <div class="guide-card">
+                    <div class="guide-card-header">
+                        <span class="guide-provider-badge badge-groq">STEP 2</span>
+                        <h3>ウェブアプリとしてデプロイ（URL発行）</h3>
+                    </div>
+                    <div class="guide-steps">
+                        <ol>
+                            <li>画面右上の青い <strong>「デプロイ」</strong> ＞ <strong>「新しいデプロイ」</strong> をクリックします。</li>
+                            <li>「種類の選択（歯車アイコン）」から <strong>「ウェブアプリ」</strong> を選びます。</li>
+                            <li>以下の2項目を設定して <strong>「デプロイ」</strong> を押します：
+                                <ul>
+                                    <li>次のユーザーとして実行：<strong>「自分」</strong></li>
+                                    <li>アクセスできるユーザー：<strong>「全員」</strong>（※合言葉が一致しないアクセスは拒否されるため安全です）</li>
+                                </ul>
+                            </li>
+                            <li>初回のみ「アクセスを承認」画面が出ます。ご自身のGoogleアカウントを選び、「このアプリはGoogleで確認されていません」と出た場合は左下の <strong>「詳細」</strong> ＞ <strong>「（プロジェクト名）（安全ではないページ）に移動」</strong> ＞ <strong>「許可」</strong> を押します。</li>
+                            <li>表示された <strong>ウェブアプリ URL</strong>（<code>https://script.google.com/macros/s/.../exec</code>）をコピーします。</li>
+                        </ol>
+                    </div>
+                </div>
+
+                <div class="guide-card">
+                    <div class="guide-card-header">
+                        <span class="guide-provider-badge badge-openrouter">STEP 3</span>
+                        <h3>QuaGenius の⚙️設定に貼って同期開始！</h3>
+                    </div>
+                    <div class="guide-steps">
+                        <ol>
+                            <li>QuaGenius の⚙️設定画面に戻り、コピーした <strong>GAS ウェブアプリ URL</strong> と STEP 1 で決めた <strong>合言葉</strong> を入力します。</li>
+                            <li><strong>「🔗 接続テスト＆今すぐ同期」</strong> を押して「✅ 同期完了」と出たら設定完了です！</li>
+                            <li>スマホや別PCでも同じ URL と合言葉を1回入力するだけで、以降は起動時・解答時に自動同期されます。</li>
+                        </ol>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-actions stats-modal-footer border-top">
+                <button type="button" id="closeGasGuideFooterBtn" class="secondary-btn" style="width: 100%;">設定画面に戻る</button>
             </div>
         </div>
     </div>
